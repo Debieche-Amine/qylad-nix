@@ -64,8 +64,8 @@
       libxrender
       libxscrnsaver
       libxi
-      libSM
-      libICE
+      libsm
+      libice
       gnome2.GConf
       nspr
       nss

@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# hypr-cgroup-ctl - Minimal CLI for managing Hyprland windows via cgroup v2
+
+set -euo pipefail
+
+if [[ -z "${XDG_RUNTIME_DIR:-}" || ! -d "$XDG_RUNTIME_DIR/hypr" ]]; then
+    if [[ -d "/run/user/$(id -u)/hypr" ]]; then
+        export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    fi
+fi
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RESOLVER_SCRIPT="$SCRIPT_DIR/lib/cgroup-hypr-resolver.sh"
+WRITER_SCRIPT="$SCRIPT_DIR/cgroup-writer.sh"
+
+show_help() {
+    cat <<'EOF'
+Usage: hypr-cgroup-ctl [TARGET OPTIONS] <set|get|status> [KNOB] [VALUE...]
+
+TARGET OPTIONS:
+  --all                      Target ALL windows (both active and inactive)
+  --active                   Target the currently focused window
+  --inactive                 Target all windows EXCEPT the currently focused window
+  --window <addr|pid|class>  Target a specific window by address (0x...), PID, or class name
+  --workspace <name|id>      Target all workspaces (e.g. A:0, Z:0, active)
+  --anchor <anchor_name>     Target all workspaces matching an anchor prefix (e.g. A matches A:0, A:1)
+
+LAYOUT FILTERS:
+  --floating                 Filter for floating windows only
+  --tiled                    Filter for tiled windows only
+  --fullscreen               Filter for fullscreen windows only
+  --grouped                  Filter for grouped/tabbed windows only
+
+ACTIONS:
+  set <knob> <value...>      Set any cgroup v2 knob (e.g. cgroup.freeze 1, cpu.max 10000 100000, memory.high 1G)
+  get <knob>                 Read any cgroup v2 knob (e.g. cgroup.freeze, memory.current, cpu.pressure)
+  status                     Display summary status for target windows
+
+EXAMPLES:
+  hypr-cgroup-ctl --inactive set cgroup.freeze 1
+  hypr-cgroup-ctl --inactive set cgroup.freeze 0
+  hypr-cgroup-ctl --inactive set cpu.idle 1
+  hypr-cgroup-ctl --inactive set cpu.max 10000 100000
+  hypr-cgroup-ctl --all set cpu.max max 100000
+  hypr-cgroup-ctl --workspace Z:0 set cgroup.kill 1
+  hypr-cgroup-ctl --window firefox set memory.high 1G
+  hypr-cgroup-ctl --active get cpu.pressure
+  hypr-cgroup-ctl --active status
+EOF
+}
+
+# Defaults
+RESOLVER_ARGS=()
+ACTION=""
+ACTION_ARGS=()
+VERBOSE=0
+QUIET=0
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --all|--active|--inactive|--beside-active|--inactive-all|--floating|--tiled|--fullscreen|--grouped)
+            RESOLVER_ARGS+=("$1")
+            shift
+            ;;
+        --window|--workspace|--anchor)
+            if [[ -z "${2:-}" ]]; then
+                echo "Error: Option '$1' requires an argument." >&2
+                exit 1
+            fi
+            RESOLVER_ARGS+=("$1" "$2")
+            shift 2
+            ;;
+        -v|--verbose)
+            VERBOSE=1
+            export VERBOSE=1
+            shift
+            ;;
+        -q|--quiet)
+            QUIET=1
+            shift
+            ;;
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        status)
+            ACTION="$1"
+            shift
+            ;;
+        get)
+            ACTION="$1"
+            if [[ -n "${2:-}" && "$2" != -* ]]; then
+                ACTION_ARGS+=("$2")
+                shift 2
+            else
+                echo "Error: Action 'get' requires a <knob> argument." >&2
+                exit 1
+            fi
+            ;;
+        set)
+            ACTION="$1"
+            shift
+            if [[ $# -ge 2 && "$1" != -* ]]; then
+                ACTION_ARGS+=("$1")
+                shift
+                while [[ $# -gt 0 && "$1" != -* ]]; do
+                    ACTION_ARGS+=("$1")
+                    shift
+                done
+            else
+                echo "Error: Action 'set' requires <knob> and <value...> arguments." >&2
+                exit 1
+            fi
+            ;;
+        *)
+            echo "Error: Invalid argument or unrecognized action '$1'" >&2
+            echo "Run 'hypr-cgroup-ctl --help' for usage info." >&2
+            exit 1
+            ;;
+    esac
+done
+
+if [[ -z "$ACTION" ]]; then
+    echo "Error: No action specified." >&2
+    echo "Run 'hypr-cgroup-ctl --help' for usage info." >&2
+    exit 1
+fi
+
+if [[ ${#RESOLVER_ARGS[@]} -eq 0 ]]; then
+    echo "Error: No target specified. (Use --active, --inactive, --anchor <name>, --workspace <name>, or --window <target>)" >&2
+    exit 1
+fi
+
+# Run target resolver
+TARGET_RECORDS=$("$RESOLVER_SCRIPT" "${RESOLVER_ARGS[@]}")
+
+if [[ -z "$TARGET_RECORDS" ]]; then
+    if [[ $QUIET -eq 0 ]]; then
+        echo "No matching windows found for the specified target options."
+    fi
+    exit 0
+fi
+
+if [[ -f "$WRITER_SCRIPT" ]]; then
+    # shellcheck source=/dev/null
+    source "$WRITER_SCRIPT"
+fi
+
+# Apply action to resolved targets
+COUNT=0
+echo "$TARGET_RECORDS" | while IFS='|' read -r addr pid class ws_name cgroup_path; do
+    if [[ -z "$cgroup_path" || ! -d "$cgroup_path" ]]; then
+        continue
+    fi
+
+    if [[ $QUIET -eq 0 ]]; then
+        printf "[%s] Win: %s | PID: %s | Class: %s | WS: %s\n" "$ACTION" "$addr" "$pid" "$class" "$ws_name"
+    fi
+
+    if declare -f apply_action >/dev/null 2>&1; then
+        apply_action "$cgroup_path" "$ACTION" "${ACTION_ARGS[@]}"
+    else
+        "$WRITER_SCRIPT" "$cgroup_path" "$ACTION" "${ACTION_ARGS[@]}"
+    fi
+
+    COUNT=$(( COUNT + 1 ))
+done

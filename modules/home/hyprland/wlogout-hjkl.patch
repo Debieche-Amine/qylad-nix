@@ -1,0 +1,49 @@
+--- a/main.c
++++ b/main.c
+@@ -38,6 +38,7 @@
+ static char *css_path = NULL;
+ static button *buttons = NULL;
+ static GtkWidget *gtk_window = NULL;
++static GtkWidget *first_button = NULL;
+ static int num_buttons = 0;
+ static int draw = 0;
+ static int num_of_monitors = 0;
+@@ -517,6 +518,23 @@
+         gtk_main_quit();
+         return TRUE;
+     }
++    switch (event->keyval)
++    {
++    case GDK_KEY_h:
++        gtk_widget_child_focus(gtk_window, GTK_DIR_LEFT);
++        return TRUE;
++    case GDK_KEY_j:
++        gtk_widget_child_focus(gtk_window, GTK_DIR_DOWN);
++        return TRUE;
++    case GDK_KEY_k:
++        gtk_widget_child_focus(gtk_window, GTK_DIR_UP);
++        return TRUE;
++    case GDK_KEY_l:
++        gtk_widget_child_focus(gtk_window, GTK_DIR_RIGHT);
++        return TRUE;
++    default:
++        break;
++    }
+     for (int i = 0; i < num_buttons; i++)
+     {
+         if (buttons[i].bind == event->keyval)
+@@ -661,6 +679,9 @@
+             }
+             but[i][j] = gtk_button_new_with_label(buttons[count].text);
+             gtk_widget_set_name(but[i][j], buttons[count].label);
++            /* Suspend is the safest useful default action. */
++            if (count == 2)
++                first_button = but[i][j];
+             gtk_label_set_yalign(
+                 GTK_LABEL(gtk_bin_get_child(GTK_BIN(but[i][j]))),
+                 buttons[count].yalign);
+@@ -757,3 +778,4 @@
+     load_buttons(GTK_CONTAINER(active_box));
+     load_css();
++    gtk_widget_grab_focus(first_button);
+     gtk_widget_show_all(gtk_window);

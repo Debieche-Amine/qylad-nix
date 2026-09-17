@@ -4,6 +4,8 @@
   pkgs,
   ...
 }: {
+  boot.supportedFilesystems = ["ntfs" "exfat"];
+
   boot.loader.systemd-boot.enable = false;
   boot.loader.efi.canTouchEfiVariables = true;
 

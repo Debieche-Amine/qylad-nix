@@ -1,0 +1,7 @@
+# ESP-IDF configuration defaults
+# Increases main task stack size required for Rust std
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# Watchdog settings
+CONFIG_INT_WDT=y
+CONFIG_ESP_TASK_WDT_EN=y

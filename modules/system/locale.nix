@@ -1,6 +1,6 @@
-{...}: {
-  # Set your time zone.
-  time.timeZone = "Africa/Algiers";
+{lib, ...}: {
+  # Set your time zone (mkDefault allows automatic-timezoned to manage it dynamically)
+  time.timeZone = lib.mkDefault "Africa/Algiers";
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";

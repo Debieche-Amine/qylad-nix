@@ -22,7 +22,7 @@
       set -g fish_cursor_replace_one underscore
       # Auto-start Zellij
       if status is-interactive; and not set -q ZELLIJ; and test "$TERM" != "dumb"; and not set -q VSCODE_SHELL_INTEGRATION_ID; and not set -q TERMINAL_EMULATOR
-          zellij
+          # zellij
       end
     '';
   };

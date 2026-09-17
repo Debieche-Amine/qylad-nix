@@ -4,5 +4,6 @@
     ./gui.nix
     ./dev.nix
     ./nix.nix
+    ./agy.nix
   ];
 }

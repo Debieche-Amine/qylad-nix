@@ -1,0 +1,52 @@
+{pkgs, ...}: {
+  # High performance governor for instant responsiveness
+  powerManagement.cpuFreqGovernor = "performance";
+
+  # Thermal management daemon to proactively handle thermal zones
+  services.thermald.enable = true;
+
+  # Power limits tailored to this MSI chassis and 60W power budget
+  services.throttled = {
+    enable = true;
+    extraConfig = ''
+      [GENERAL]
+      Enabled: True
+      Sysfs_Power_Path: /sys/class/power_supply/AC*/online
+      Autoreload: True
+
+      [AC]
+      Update_Rate_s: 5
+      PL1_Tdp_W: 25
+      PL1_Duration_s: 60
+      PL2_Tdp_W: 25
+      PL2_Duration_S: 60
+      Trip_Temp_C: 85
+      cTDP: 0
+      Disable_BDPROCHOT: False
+
+      [BATTERY]
+      Update_Rate_s: 30
+      PL1_Tdp_W: 15
+      PL1_Duration_s: 30
+      PL2_Tdp_W: 18
+      PL2_Duration_S: 10
+      Trip_Temp_C: 80
+      cTDP: 0
+      Disable_BDPROCHOT: False
+
+      [UNDERVOLT.AC]
+      CORE: 0
+      GPU: 0
+      CACHE: 0
+      UNCORE: 0
+      ANALOGIO: 0
+
+      [UNDERVOLT.BATTERY]
+      CORE: 0
+      GPU: 0
+      CACHE: 0
+      UNCORE: 0
+      ANALOGIO: 0
+    '';
+  };
+}

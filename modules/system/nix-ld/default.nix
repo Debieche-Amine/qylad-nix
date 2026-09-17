@@ -13,23 +13,21 @@
       (pkgs.runCommand "steamrun-lib" {} "mkdir $out; ln -s ${pkgs.steam-run.fhsenv}/usr/lib64 $out/lib")
       stdenv.cc.cc.lib
 
-      mysql80
-
       libpcap
 
       # X11
-      libX11
-      libXext
-      libXrandr
-      libXrender
-      libXcursor
-      libXi
-      libXfixes
-      libXcomposite
-      libXdamage
-      libXtst
-      libXau
-      libXdmcp
+      libx11
+      libxext
+      libxrandr
+      libxrender
+      libxcursor
+      libxi
+      libxfixes
+      libxcomposite
+      libxdamage
+      libxtst
+      libxau
+      libxdmcp
       libxcb
       libxcb-util
       libxcb-render-util
@@ -67,6 +65,7 @@
 
       # SDL2
       SDL2
+      sdl3
       # List by default
       zlib
       zstd
@@ -84,19 +83,19 @@
       systemd
 
       # My own additions
-      xorg.libXcomposite
-      xorg.libXtst
-      xorg.libXrandr
-      xorg.libXext
-      xorg.libX11
-      xorg.libXfixes
+      libxcomposite
+      libxtst
+      libxrandr
+      libxext
+      libx11
+      libxfixes
       libGL
       libva
       pipewire
-      xorg.libxcb
-      xorg.libXdamage
-      xorg.libxshmfence
-      xorg.libXxf86vm
+      libxcb
+      libxdamage
+      libxshmfence
+      libxxf86vm
       libelf
 
       # Required
@@ -116,13 +115,13 @@
       # glibc_multi.bin # Seems to cause issue in ARM
 
       # # Without these it silently fails
-      xorg.libXinerama
-      xorg.libXcursor
-      xorg.libXrender
-      xorg.libXScrnSaver
-      xorg.libXi
-      xorg.libSM
-      xorg.libICE
+      libxinerama
+      libxcursor
+      libxrender
+      libxscrnsaver
+      libxi
+      libsm
+      libice
       gnome2.GConf
       nspr
       nss
@@ -148,13 +147,13 @@
       # other issue: (Unity:377230): GLib-GIO-CRITICAL **: 21:09:04.706: g_dbus_proxy_call_sync_internal: assertion 'G_IS_DBUS_PROXY (proxy)' failed
 
       # Verified games requirements
-      xorg.libXt
-      xorg.libXmu
+      libxt
+      libxmu
       libogg
       libvorbis
       SDL
       SDL2_image
-      glew110
+      glew_1_10
       libidn
       tbb
 
@@ -183,7 +182,7 @@
       libgcrypt
       libvpx
       librsvg
-      xorg.libXft
+      libxft
       libvdpau
       # ...
       # Some more libraries that I needed to run programs

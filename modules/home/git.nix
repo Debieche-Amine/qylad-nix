@@ -5,17 +5,46 @@
 }: {
   programs.git = {
     enable = true;
+
     settings = {
-      user.name = "Amine";
-      user.email = "Debieche-Amine@users.noreply.github.com";
+      user.name = "Qylad";
+      user.email = "qylad@porton.me";
       signing = {
-        key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE7cM18ycWHX4UkDI2rIAZMlhBp4WJ0tTMJVgNSUbrbD";
+        format = "ssh";
+        key = "${config.home.homeDirectory}/.ssh/qyladx.pub";
         signByDefault = true;
       };
 
       color.ui = true;
       push.default = "simple";
       init.defaultBranch = "main";
+    };
+  };
+
+  programs.ssh = {
+    enable = true;
+    matchBlocks = {
+      "github.com" = {
+        hostname = "github.com";
+        user = "git";
+        identityFile = "${config.home.homeDirectory}/.ssh/qyladx";
+        identitiesOnly = true;
+      };
+    };
+  };
+
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
+    options = {
+      navigate = true;
+      line-numbers = true;
+      side-by-side = false;
+      syntax-theme = "base16";
+      plus-style = "syntax #1a3d24";
+      minus-style = "syntax #421a1d";
+      plus-emph-style = "syntax #2e6c3e";
+      minus-emph-style = "syntax #6e272d";
     };
   };
 }

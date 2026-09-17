@@ -16,7 +16,7 @@
     ../../modules/system/programs.nix
     ../../modules/system/ssh.nix
     ../../modules/system/pkgs
-    ../../modules/system/DE/gnome.nix
+    ../../modules/system/desktops/gnome.nix
 
     ../../modules/users/${username}/system.nix
   ];

@@ -7,12 +7,6 @@
     enable = true;
 
     settings = {
-      # 1. Font
-      font = {
-        normal = {family = "FiraCode Nerd Font";};
-        size = 16;
-      };
-
       # 2. Window essentials
       window = {
         dimensions = {
