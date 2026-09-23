@@ -4,7 +4,15 @@
   ...
 }: let
   homeDir = config.home.homeDirectory;
-  antigravityCli = pkgs.unstable.antigravity-cli;
+  antigravityCli = pkgs.symlinkJoin {
+    name = "antigravity-cli";
+    paths = [pkgs.unstable.antigravity-cli];
+    nativeBuildInputs = [pkgs.makeWrapper];
+    postBuild = ''
+      wrapProgram $out/bin/agy \
+        --set DBUS_SESSION_BUS_ADDRESS "unix:path=/tmp/nonexistent-dbus-socket"
+    '';
+  };
 
   # Declarative Antigravity settings & preferences
   antigravitySettings = {
@@ -242,6 +250,7 @@
     export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
     export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
     export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
     export GOPATH="$REAL_HOME/go"
     export CARGO_HOME="$REAL_HOME/.cargo"
     export RUSTUP_HOME="$REAL_HOME/.rustup"
@@ -402,7 +411,11 @@
             tmp_cli = os.path.join(tmpdir, ".gemini", "antigravity-cli")
             os.makedirs(tmp_cli, exist_ok=True)
             os.symlink(tok_file, os.path.join(tmp_cli, "antigravity-oauth-token"))
-            env = dict(os.environ, HOME=tmpdir)
+            env = dict(
+                os.environ,
+                HOME=tmpdir,
+                DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
+            )
             try:
                 res = subprocess.run(
                     ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
