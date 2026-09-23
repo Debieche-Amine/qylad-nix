@@ -6,6 +6,28 @@
   homeDir = config.home.homeDirectory;
   antigravityCli = pkgs.unstable.antigravity-cli;
 
+  # Declarative Antigravity settings & preferences
+  antigravitySettings = {
+    artifactReviewPolicy = "agent-decides";
+    editorMode = "vim";
+    vimInsertFirst = true;
+    model = "Gemini 3.8 Flash (High)";
+    showFeedbackSurvey = false;
+    statusLine = {
+      type = "";
+      command = "";
+      enabled = false;
+    };
+    toolPermission = "always-proceed";
+    trustedWorkspaces = [
+      homeDir
+      "${homeDir}/nixos"
+      "${homeDir}/project"
+      "${homeDir}/ram"
+      "/tmp"
+    ];
+  };
+
   # agy-switch: Switch the active account in ~/.gemini/antigravity-cli
   agy-switch = pkgs.writeShellScriptBin "agy-switch" ''
     set -euo pipefail
@@ -168,7 +190,7 @@
     esac
   '';
 
-  # agyn: Runner for executing commands using a specific account ephemerally
+  # agyn: Runner for executing commands using a specific account with declarative settings
   agyn = pkgs.writeShellScriptBin "agyn" ''
     set -euo pipefail
 
@@ -190,29 +212,35 @@
       exit 1
     fi
 
-    TMP_HOME=$(mktemp -d "/tmp/agy-acc-$ACCOUNT_ID-XXXXXX")
+    PROFILE_HOME="$ACCOUNT_DIR/profile"
+    PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
+    mkdir -p "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini"
+
+    # Symlink declarative home-manager settings so all accounts share the exact same config
+    ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
+    ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
+    ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
+    ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
+
+    # Ensure account token and email are synced
+    if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
+      cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
+    fi
+
+    if [ -f "$ACCOUNT_DIR/email" ]; then
+      cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
+    fi
+
     cleanup() {
-      if [ -f "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token" ]; then
-        cp -f "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token" "$TOKEN_FILE"
+      if [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
+        cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
       fi
-      rm -rf "$TMP_HOME"
     }
     trap cleanup EXIT INT TERM
 
-    mkdir -p "$TMP_HOME/.gemini/antigravity-cli"
-    cp -f "$TOKEN_FILE" "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token"
-
-    if [ -f "$ACCOUNT_DIR/email" ]; then
-      cp -f "$ACCOUNT_DIR/email" "$TMP_HOME/.gemini/antigravity-cli/.cached_email"
-    fi
-
-    if [ -f "$REAL_HOME/.gemini/antigravity-cli/settings.json" ]; then
-      cp -f "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$TMP_HOME/.gemini/antigravity-cli/settings.json"
-    fi
-
-    export HOME="$TMP_HOME"
-    export XDG_CONFIG_HOME="$TMP_HOME/.config"
-    export XDG_DATA_HOME="$TMP_HOME/.local/share"
+    export HOME="$PROFILE_HOME"
+    export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
+    export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
     export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
     export GOPATH="$REAL_HOME/go"
     export CARGO_HOME="$REAL_HOME/.cargo"
@@ -556,4 +584,55 @@ in {
       agy-usage
     ]
     ++ agyWrappers;
+
+  # Declarative Antigravity settings and completed onboarding state
+  home.file.".gemini/antigravity-cli/settings.json" = {
+    text = builtins.toJSON antigravitySettings;
+    force = true;
+  };
+
+  home.file.".gemini/antigravity-cli/cache/onboarding.json" = {
+    text = builtins.toJSON {
+      consumerOnboardingComplete = true;
+      enterpriseOnboardingComplete = false;
+      onboardingComplete = true;
+    };
+    force = true;
+  };
+
+  home.file.".gemini/antigravity-cli/jetski_state.pbtxt" = {
+    text = ''
+      post_onboarding:  {
+        completed_steps:  POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME
+        completed_steps:  POST_ONBOARDING_STEP_TYPE_USAGE_MODE
+        completed_steps:  POST_ONBOARDING_STEP_TYPE_AGENT_CONFIGURATION
+        completed_steps:  POST_ONBOARDING_STEP_TYPE_ADD_WORKSPACE
+      }
+      installation_uuid:  "231838c3-0c7e-4b19-97d6-51b12fdc0f84"
+      migrations:  {
+        key:  3
+        value:  MIGRATION_STATUS_COMPLETED
+      }
+      migrations:  {
+        key:  4
+        value:  MIGRATION_STATUS_COMPLETED
+      }
+      migrations:  {
+        key:  5
+        value:  MIGRATION_STATUS_COMPLETED
+      }
+    '';
+    force = true;
+  };
+
+  home.file.".gemini/settings.json" = {
+    text = builtins.toJSON {
+      security.auth.selectedType = "oauth-personal";
+      general = {
+        vimMode = true;
+        preferredEditor = "neovim";
+      };
+    };
+    force = true;
+  };
 }

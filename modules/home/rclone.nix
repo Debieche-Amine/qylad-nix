@@ -6,6 +6,8 @@
 }: let
   secretDir = "${config.secrets.dir}/rclone";
   qylad03TokenFile = "${secretDir}/qylad03-token";
+  qylad03ClientIdFile = "${secretDir}/qylad03-client-id";
+  qylad03ClientSecretFile = "${secretDir}/qylad03-client-secret";
   rvnvtrklFdfTokenFile = "${secretDir}/rvnvtrklFdf-token";
 
   mkMountCleanup = name: mountPoint: {
@@ -36,6 +38,8 @@ in {
 
         secrets = {
           token = qylad03TokenFile;
+          client_id = qylad03ClientIdFile;
+          client_secret = qylad03ClientSecretFile;
         };
 
         mounts = {
