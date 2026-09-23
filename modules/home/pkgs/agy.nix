@@ -298,7 +298,7 @@
             "bright_red": "\033[91m",
             "bright_cyan": "\033[96m",
         }
-        return f"{colors.get(color_name, \"\")}{text}{colors['reset']}"
+        return colors.get(color_name, "") + text + colors["reset"]
 
     def render_bar(fraction, width=10):
         if fraction is None:
@@ -379,7 +379,7 @@
                 res = subprocess.run(
                     ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
                     stdin=subprocess.DEVNULL,
-                    capture_output=True, text=True, timeout=15, env=env
+                    capture_output=True, text=True, timeout=25, env=env
                 )
                 if "Authentication required" in res.stdout or "Authentication required" in res.stderr:
                     return {"name": acc_id, "connected": False, "reason": "Auth expired", "email": email}
