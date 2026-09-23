@@ -4,195 +4,239 @@
   ...
 }: let
   homeDir = config.home.homeDirectory;
+  antigravityCli = pkgs.unstable.antigravity-cli;
 
-  agy2 = pkgs.writeShellScriptBin "agy2" ''
-    export HOME=${homeDir}/.homes/home2
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy2-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+  # agy-switch: Switch the active account in ~/.gemini/antigravity-cli
+  agy-switch = pkgs.writeShellScriptBin "agy-switch" ''
+    set -euo pipefail
 
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
+    ACCOUNTS_DIR="$HOME/.gemini/accounts"
+    CLI_DIR="$HOME/.gemini/antigravity-cli"
+    ACTIVE_TOKEN="$CLI_DIR/antigravity-oauth-token"
+    CURRENT_FILE="$ACCOUNTS_DIR/.current"
 
-    chmod 700 "$XDG_RUNTIME_DIR"
+    mkdir -p "$ACCOUNTS_DIR" "$CLI_DIR"
 
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
+    sync_current() {
+      if [ -f "$CURRENT_FILE" ] && [ -f "$ACTIVE_TOKEN" ]; then
+        local cur_id
+        cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
+        if [ -n "$cur_id" ] && [ -d "$ACCOUNTS_DIR/$cur_id" ]; then
+          cp -f "$ACTIVE_TOKEN" "$ACCOUNTS_DIR/$cur_id/antigravity-oauth-token"
+          if [ -f "$CLI_DIR/.cached_email" ]; then
+            cp -f "$CLI_DIR/.cached_email" "$ACCOUNTS_DIR/$cur_id/email"
+          fi
+        fi
+      fi
+    }
+
+    list_accounts() {
+      sync_current
+      local cur_id=""
+      [ -f "$CURRENT_FILE" ] && cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
+
+      echo -e "\033[1mAntigravity Accounts\033[0m (~/.gemini/accounts):"
+      echo "──────────────────────────────────────────────"
+      local found=0
+      for dir in $(find "$ACCOUNTS_DIR" -mindepth 1 -maxdepth 1 -type d | sort -V); do
+        local id
+        id=$(basename "$dir")
+        local email="(no email)"
+        [ -f "$dir/email" ] && email=$(cat "$dir/email" | tr -d '[:space:]')
+
+        if [ "$id" = "$cur_id" ]; then
+          printf "  \033[1;32m* [%-3s]\033[0m %-30s \033[1;32m(active)\033[0m\n" "$id" "$email"
+        else
+          printf "    [%-3s] %-30s\n" "$id" "$email"
+        fi
+        found=1
+      done
+
+      if [ $found -eq 0 ]; then
+        echo "  No accounts found."
+      fi
+      echo "──────────────────────────────────────────────"
+      echo "Usage: agy-switch <id>        Switch active account"
+      echo "       agy-switch add <id>     Add a new account slot"
+      echo "       agy-switch save <id>    Save current login to slot <id>"
+      echo "       agy-switch current      Show current active account"
+    }
+
+    switch_account() {
+      local target_id="$1"
+      local target_dir="$ACCOUNTS_DIR/$target_id"
+
+      if [ ! -d "$target_dir" ] || [ ! -f "$target_dir/antigravity-oauth-token" ]; then
+        echo -e "\033[1;31mError:\033[0m Account '$target_id' not found in $ACCOUNTS_DIR" >&2
+        echo "Run 'agy-switch' to list available accounts." >&2
+        exit 1
+      fi
+
+      sync_current
+
+      cp -f "$target_dir/antigravity-oauth-token" "$ACTIVE_TOKEN"
+      chmod 600 "$ACTIVE_TOKEN"
+
+      local target_email="(no email)"
+      if [ -f "$target_dir/email" ]; then
+        cp -f "$target_dir/email" "$CLI_DIR/.cached_email"
+        target_email=$(cat "$target_dir/email" | tr -d '[:space:]')
+      fi
+
+      echo "$target_id" > "$CURRENT_FILE"
+      echo -e "\033[1;32m✔ Switched to account [$target_id]:\033[0m $target_email"
+    }
+
+    save_account() {
+      local target_id="$1"
+      local target_dir="$ACCOUNTS_DIR/$target_id"
+      mkdir -p "$target_dir"
+
+      if [ ! -f "$ACTIVE_TOKEN" ]; then
+        echo -e "\033[1;31mError:\033[0m No active token found in $ACTIVE_TOKEN" >&2
+        exit 1
+      fi
+
+      cp -f "$ACTIVE_TOKEN" "$target_dir/antigravity-oauth-token"
+      chmod 600 "$target_dir/antigravity-oauth-token"
+
+      local email=""
+      if [ $# -ge 2 ]; then
+        email="$2"
+      elif [ -f "$CLI_DIR/.cached_email" ]; then
+        email=$(cat "$CLI_DIR/.cached_email" | tr -d '[:space:]')
+      fi
+
+      if [ -n "$email" ]; then
+        echo "$email" > "$target_dir/email"
+      fi
+
+      echo "$target_id" > "$CURRENT_FILE"
+      echo -e "\033[1;32m✔ Saved current login as account [$target_id]:\033[0m $email"
+    }
+
+    add_account() {
+      local new_id="$1"
+      local target_dir="$ACCOUNTS_DIR/$new_id"
+
+      if [ -d "$target_dir" ] && [ -f "$target_dir/antigravity-oauth-token" ]; then
+        echo -e "\033[1;33mWarning:\033[0m Account '$new_id' already exists. Use 'agy-switch $new_id' to switch to it, or 'agy-switch save $new_id' to overwrite." >&2
+        exit 1
+      fi
+
+      sync_current
+      rm -f "$ACTIVE_TOKEN" "$CLI_DIR/.cached_email"
+      echo "$new_id" > "$CURRENT_FILE"
+
+      echo -e "\033[1;36mAccount slot [$new_id] prepared.\033[0m"
+      echo "Now run 'agy' to sign in with your Google account."
+      echo "Once logged in, run: agy-switch save $new_id"
+    }
+
+    case "''${1:-}" in
+      "")
+        list_accounts
+        ;;
+      "list"|"-l"|"--list")
+        list_accounts
+        ;;
+      "current"|"whoami"|"status")
+        sync_current
+        cur_id=""
+        [ -f "$CURRENT_FILE" ] && cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
+        email=""
+        [ -f "$CLI_DIR/.cached_email" ] && email=$(cat "$CLI_DIR/.cached_email" | tr -d '[:space:]')
+        echo "Active account: [$cur_id] $email"
+        ;;
+      "save")
+        if [ $# -lt 2 ]; then
+          echo "Usage: agy-switch save <id> [email]" >&2
+          exit 1
+        fi
+        save_account "$2" "''${3:-}"
+        ;;
+      "add"|"new"|"login")
+        if [ $# -lt 2 ]; then
+          echo "Usage: agy-switch add <id>" >&2
+          exit 1
+        fi
+        add_account "$2"
+        ;;
+      *)
+        switch_account "$1"
+        ;;
+    esac
   '';
 
-  agy3 = pkgs.writeShellScriptBin "agy3" ''
-    export HOME=${homeDir}/.homes/home3
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy3-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+  # agyn: Runner for executing commands using a specific account ephemerally
+  agyn = pkgs.writeShellScriptBin "agyn" ''
+    set -euo pipefail
 
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
+    if [ $# -lt 1 ]; then
+      echo "Usage: agyn <account_id> [agy args...]" >&2
+      echo "Example: agyn 2 -p 'hello'" >&2
+      exit 1
+    fi
 
-    chmod 700 "$XDG_RUNTIME_DIR"
+    ACCOUNT_ID="$1"
+    shift
 
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
+    REAL_HOME="$HOME"
+    ACCOUNT_DIR="$REAL_HOME/.gemini/accounts/$ACCOUNT_ID"
+    TOKEN_FILE="$ACCOUNT_DIR/antigravity-oauth-token"
+
+    if [ ! -f "$TOKEN_FILE" ]; then
+      echo -e "\033[1;31mError:\033[0m Account '$ACCOUNT_ID' not found in ~/.gemini/accounts" >&2
+      exit 1
+    fi
+
+    TMP_HOME=$(mktemp -d "/tmp/agy-acc-$ACCOUNT_ID-XXXXXX")
+    cleanup() {
+      if [ -f "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token" ]; then
+        cp -f "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token" "$TOKEN_FILE"
+      fi
+      rm -rf "$TMP_HOME"
+    }
+    trap cleanup EXIT INT TERM
+
+    mkdir -p "$TMP_HOME/.gemini/antigravity-cli"
+    cp -f "$TOKEN_FILE" "$TMP_HOME/.gemini/antigravity-cli/antigravity-oauth-token"
+
+    if [ -f "$ACCOUNT_DIR/email" ]; then
+      cp -f "$ACCOUNT_DIR/email" "$TMP_HOME/.gemini/antigravity-cli/.cached_email"
+    fi
+
+    if [ -f "$REAL_HOME/.gemini/antigravity-cli/settings.json" ]; then
+      cp -f "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$TMP_HOME/.gemini/antigravity-cli/settings.json"
+    fi
+
+    export HOME="$TMP_HOME"
+    export XDG_CONFIG_HOME="$TMP_HOME/.config"
+    export XDG_DATA_HOME="$TMP_HOME/.local/share"
+    export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
+    export GOPATH="$REAL_HOME/go"
+    export CARGO_HOME="$REAL_HOME/.cargo"
+    export RUSTUP_HOME="$REAL_HOME/.rustup"
+
+    exec ${antigravityCli}/bin/agy "$@"
   '';
 
-  agy4 = pkgs.writeShellScriptBin "agy4" ''
-    export HOME=${homeDir}/.homes/home4
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy4-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+  # Backward compatibility wrappers: agy2, agy3, ..., agy10
+  mkAgyWrapper = id:
+    pkgs.writeShellScriptBin "agy${toString id}" ''
+      exec ${agyn}/bin/agyn ${toString id} "$@"
+    '';
+  agyWrappers = map mkAgyWrapper [2 3 4 5 6 7 8 9 10];
 
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy5 = pkgs.writeShellScriptBin "agy5" ''
-    export HOME=${homeDir}/.homes/home5
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy5-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.master.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy6 = pkgs.writeShellScriptBin "agy6" ''
-    export HOME=${homeDir}/.homes/home6
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy6-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy7 = pkgs.writeShellScriptBin "agy7" ''
-    export HOME=${homeDir}/.homes/home7
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy7-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy8 = pkgs.writeShellScriptBin "agy8" ''
-    export HOME=${homeDir}/.homes/home8
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy8-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy9 = pkgs.writeShellScriptBin "agy9" ''
-    export HOME=${homeDir}/.homes/home9
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy9-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
-  agy10 = pkgs.writeShellScriptBin "agy10" ''
-    export HOME=${homeDir}/.homes/home10
-    export XDG_CONFIG_HOME="$HOME/config"
-    export XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache"
-    export XDG_RUNTIME_DIR=/tmp/agy10-runtime
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-
-    mkdir -p \
-      "$HOME" \
-      "$XDG_CONFIG_HOME" \
-      "$XDG_DATA_HOME" \
-      "$XDG_CACHE_HOME" \
-      "$XDG_RUNTIME_DIR"
-
-    chmod 700 "$XDG_RUNTIME_DIR"
-
-    exec ${pkgs.unstable.antigravity-cli}/bin/agy "$@"
-  '';
-
+  # agy-usage: Parallel account usage checker querying ~/.gemini/accounts
   agy-usage = pkgs.writeShellScriptBin "agy-usage" ''
-        exec ${pkgs.python3}/bin/python3 - "$@" << 'PYEOF'
+    exec ${pkgs.python3}/bin/python3 - "$@" << 'PYEOF'
     import os
     import sys
     import json
     import re
+    import tempfile
     import subprocess
-    import urllib.request
     from datetime import datetime, timezone
     from concurrent.futures import ThreadPoolExecutor
 
@@ -208,6 +252,30 @@
 
     show_email = "-e" in args or "--email" in args
     json_mode = "--json" in args
+
+    accounts_dir = os.path.expanduser("~/.gemini/accounts")
+    current_file = os.path.join(accounts_dir, ".current")
+    current_id = None
+    if os.path.exists(current_file):
+        try:
+            with open(current_file) as f:
+                current_id = f.read().strip()
+        except Exception:
+            pass
+
+    account_ids = []
+    if os.path.isdir(accounts_dir):
+        for entry in os.listdir(accounts_dir):
+            if os.path.isdir(os.path.join(accounts_dir, entry)) and not entry.startswith('.'):
+                account_ids.append(entry)
+    account_ids.sort(key=lambda x: int(x) if x.isdigit() else x)
+
+    if not account_ids:
+        if json_mode:
+            print("[]")
+        else:
+            print(f"No accounts found in {accounts_dir}")
+        sys.exit(0)
 
     is_tty = sys.stdout.isatty() or os.environ.get("FORCE_COLOR") == "1"
     if os.environ.get("NO_COLOR") == "1":
@@ -230,9 +298,7 @@
             "bright_red": "\033[91m",
             "bright_cyan": "\033[96m",
         }
-        code = colors.get(color_name, "")
-        rst = colors["reset"]
-        return f"{code}{text}{rst}"
+        return f"{colors.get(color_name, \"\")}{text}{colors['reset']}"
 
     def render_bar(fraction, width=10):
         if fraction is None:
@@ -289,115 +355,80 @@
                 return t, len(t)
         return "-", 1
 
-    def get_account_email(hdir):
-        cache_file = os.path.join(hdir, ".gemini", "antigravity-cli", ".cached_email")
-        if os.path.exists(cache_file):
+    def check_account(acc_id):
+        acc_path = os.path.join(accounts_dir, acc_id)
+        tok_file = os.path.join(acc_path, "antigravity-oauth-token")
+        email_file = os.path.join(acc_path, "email")
+        if not os.path.exists(tok_file):
+            return {"name": f"acc-{acc_id}", "connected": False, "reason": "No token", "email": None}
+
+        email = None
+        if os.path.exists(email_file):
             try:
-                with open(cache_file, "r") as f:
-                    em = f.read().strip()
-                    if em:
-                        return em
+                with open(email_file) as f:
+                    email = f.read().strip()
             except Exception:
                 pass
-        tok_file = os.path.join(hdir, ".gemini", "antigravity-cli", "antigravity-oauth-token")
-        if not os.path.exists(tok_file):
-            return None
-        try:
-            with open(tok_file, "r") as f:
-                token = json.load(f).get("token", {}).get("access_token")
-            if not token:
-                return None
-            req = urllib.request.Request(f"https://oauth2.googleapis.com/tokeninfo?access_token={token}")
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                tinfo = json.loads(resp.read().decode())
-                email = tinfo.get("email")
-                if email:
-                    try:
-                        with open(cache_file, "w") as f:
-                            f.write(email)
-                    except Exception:
-                        pass
-                    return email
-        except Exception:
-            return None
-        return None
 
-    def check_account(item):
-        name, cmd, hdir = item
-        token_path = os.path.join(hdir, ".gemini", "antigravity-cli", "antigravity-oauth-token")
-        if not os.path.exists(token_path):
-            return {"name": name, "connected": False, "reason": "Not connected", "email": None}
+        with tempfile.TemporaryDirectory(prefix=f"agy-usage-{acc_id}-") as tmpdir:
+            tmp_cli = os.path.join(tmpdir, ".gemini", "antigravity-cli")
+            os.makedirs(tmp_cli, exist_ok=True)
+            os.symlink(tok_file, os.path.join(tmp_cli, "antigravity-oauth-token"))
+            env = dict(os.environ, HOME=tmpdir)
+            try:
+                res = subprocess.run(
+                    ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True, text=True, timeout=15, env=env
+                )
+                if "Authentication required" in res.stdout or "Authentication required" in res.stderr:
+                    return {"name": acc_id, "connected": False, "reason": "Auth expired", "email": email}
+                if res.returncode != 0:
+                    return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
 
-        try:
-            res = subprocess.run(
-                [cmd, "-p", "/usage", "--output-format", "json"],
-                stdin=subprocess.DEVNULL,
-                capture_output=True, text=True, timeout=12
-            )
-            if "Authentication required" in res.stdout or "Authentication required" in res.stderr:
-                return {"name": name, "connected": False, "reason": "Not connected", "email": None}
-            if res.returncode != 0:
-                return {"name": name, "connected": False, "reason": "Not connected", "email": None}
+                data = json.loads(res.stdout)
+                if data.get("status") != "SUCCESS":
+                    return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
 
-            data = json.loads(res.stdout)
-            if data.get("status") != "SUCCESS":
-                return {"name": name, "connected": False, "reason": "Not connected", "email": None}
+                groups = data.get("command", {}).get("data", {}).get("groups", [])
+                gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
+                if not gemini:
+                    return {"name": acc_id, "connected": False, "reason": "No Gemini data", "email": email}
 
-            groups = data.get("command", {}).get("data", {}).get("groups", [])
-            gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
-            if not gemini:
-                return {"name": name, "connected": False, "reason": "No Gemini data", "email": None}
+                buckets = gemini.get("buckets", [])
+                w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
+                h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
 
-            buckets = gemini.get("buckets", [])
-            w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
-            h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
-
-            email = None
-            if show_email or json_mode:
-                email = get_account_email(hdir)
-
-            return {
-                "name": name,
-                "connected": True,
-                "email": email,
-                "weekly": {
-                    "fraction": w_b.get("remaining_fraction"),
-                    "disabled": w_b.get("disabled", False),
-                    "reset_time": w_b.get("reset_time"),
-                    "desc": w_b.get("description", "")
-                },
-                "five_hour": {
-                    "fraction": h_b.get("remaining_fraction"),
-                    "disabled": h_b.get("disabled", False),
-                    "reset_time": h_b.get("reset_time"),
-                    "desc": h_b.get("description", "")
+                return {
+                    "name": acc_id,
+                    "is_current": (acc_id == current_id),
+                    "connected": True,
+                    "email": email,
+                    "weekly": {
+                        "fraction": w_b.get("remaining_fraction"),
+                        "disabled": w_b.get("disabled", False),
+                        "reset_time": w_b.get("reset_time"),
+                        "desc": w_b.get("description", "")
+                    },
+                    "five_hour": {
+                        "fraction": h_b.get("remaining_fraction"),
+                        "disabled": h_b.get("disabled", False),
+                        "reset_time": h_b.get("reset_time"),
+                        "desc": h_b.get("description", "")
+                    }
                 }
-            }
-        except Exception:
-            return {"name": name, "connected": False, "reason": "Not connected", "email": None}
+            except Exception:
+                return {"name": acc_id, "connected": False, "reason": "Timeout/Error", "email": email}
 
-    default_home = os.environ.get("HOME", "${homeDir}")
-    targets = [
-        ("agy", "${pkgs.unstable.antigravity-cli}/bin/agy", default_home),
-        ("agy2", "${agy2}/bin/agy2", "${homeDir}/.homes/home2"),
-        ("agy3", "${agy3}/bin/agy3", "${homeDir}/.homes/home3"),
-        ("agy4", "${agy4}/bin/agy4", "${homeDir}/.homes/home4"),
-        ("agy5", "${agy5}/bin/agy5", "${homeDir}/.homes/home5"),
-        ("agy6", "${agy6}/bin/agy6", "${homeDir}/.homes/home6"),
-        ("agy7", "${agy7}/bin/agy7", "${homeDir}/.homes/home7"),
-        ("agy8", "${agy8}/bin/agy8", "${homeDir}/.homes/home8"),
-        ("agy9", "${agy9}/bin/agy9", "${homeDir}/.homes/home9"),
-        ("agy10", "${agy10}/bin/agy10", "${homeDir}/.homes/home10"),
-    ]
-
-    with ThreadPoolExecutor(max_workers=10) as ex:
-        results = list(ex.map(check_account, targets))
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(check_account, account_ids))
 
     if json_mode:
         out = []
         for r in results:
             item = {
                 "account": r["name"],
+                "is_current": r.get("is_current", False),
                 "connected": r["connected"]
             }
             if r["connected"]:
@@ -426,7 +457,7 @@
                     "disabled": h.get("disabled", False)
                 }
             else:
-                item["email"] = None
+                item["email"] = r.get("email")
                 item["reason"] = r.get("reason", "Not connected")
             out.append(item)
         print(json.dumps(out, indent=2))
@@ -456,7 +487,9 @@
     prev_connected = True
     for i, r in enumerate(results):
         name = r["name"]
-        name_fmt = c(f"{name:<{W_ACC}}", "bright_cyan" if r["connected"] else "dim")
+        is_cur = r.get("is_current", False)
+        display_name = f"*{name}" if is_cur else name
+        name_fmt = c(f"{display_name:<{W_ACC}}", "bright_cyan" if r["connected"] else "dim")
 
         if show_email and i > 0 and (r["connected"] or prev_connected):
             print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
@@ -470,7 +503,6 @@
             center_str = (" " * pad_l) + c(msg, "dim") + (" " * pad_r)
             print(b("│ ") + name_fmt + b(" │ ") + center_str + b(" │"))
         else:
-            # Format Weekly
             w = r["weekly"]
             w_frac = w.get("fraction")
             w_bar = render_bar(w_frac)
@@ -484,7 +516,6 @@
             time_pad = 7 - w_t_len
             w_col = f" {pct_str}  {w_bar}  {w_time}" + (" " * max(0, time_pad))
 
-            # Format 5h
             h = r["five_hour"]
             if h.get("disabled"):
                 h_bar = c("░" * 10, "gray")
@@ -517,17 +548,12 @@
     PYEOF
   '';
 in {
-  home.packages = [
-    pkgs.unstable.antigravity-cli
-    agy2
-    agy3
-    agy4
-    agy5
-    agy6
-    agy7
-    agy8
-    agy9
-    agy10
-    agy-usage
-  ];
+  home.packages =
+    [
+      antigravityCli
+      agy-switch
+      agyn
+      agy-usage
+    ]
+    ++ agyWrappers;
 }

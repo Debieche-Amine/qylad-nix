@@ -1,4 +1,4 @@
-# qylad-nixos
+# Qylad Lab
 
 A Nix flake for my personal systems.
 
