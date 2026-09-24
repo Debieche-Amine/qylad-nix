@@ -28,5 +28,10 @@
     pkgs.nyxt
     pkgs.floorp-bin
     pkgs.unstable.antigravity-ide
+    pkgs.tigervnc
+    pkgs.remmina
+    pkgs.kdePackages.krdc
+    pkgs.gnome-connections
+    pkgs.virt-viewer
   ];
 }
