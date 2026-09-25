@@ -36,234 +36,110 @@
     ];
   };
 
-  # agy-switch: Switch the active account in ~/.gemini/antigravity-cli
-  agy-switch = pkgs.writeShellScriptBin "agy-switch" ''
-    set -euo pipefail
-
-    ACCOUNTS_DIR="$HOME/.gemini/accounts"
-    CLI_DIR="$HOME/.gemini/antigravity-cli"
-    ACTIVE_TOKEN="$CLI_DIR/antigravity-oauth-token"
-    CURRENT_FILE="$ACCOUNTS_DIR/.current"
-
-    mkdir -p "$ACCOUNTS_DIR" "$CLI_DIR"
-
-    sync_current() {
-      if [ -f "$CURRENT_FILE" ] && [ -f "$ACTIVE_TOKEN" ]; then
-        local cur_id
-        cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
-        if [ -n "$cur_id" ] && [ -d "$ACCOUNTS_DIR/$cur_id" ]; then
-          cp -f "$ACTIVE_TOKEN" "$ACCOUNTS_DIR/$cur_id/antigravity-oauth-token"
-          if [ -f "$CLI_DIR/.cached_email" ]; then
-            cp -f "$CLI_DIR/.cached_email" "$ACCOUNTS_DIR/$cur_id/email"
-          fi
-        fi
-      fi
-    }
-
-    list_accounts() {
-      sync_current
-      local cur_id=""
-      [ -f "$CURRENT_FILE" ] && cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
-
-      echo -e "\033[1mAntigravity Accounts\033[0m (~/.gemini/accounts):"
-      echo "──────────────────────────────────────────────"
-      local found=0
-      for dir in $(find "$ACCOUNTS_DIR" -mindepth 1 -maxdepth 1 -type d | sort -V); do
-        local id
-        id=$(basename "$dir")
-        local email="(no email)"
-        [ -f "$dir/email" ] && email=$(cat "$dir/email" | tr -d '[:space:]')
-
-        if [ "$id" = "$cur_id" ]; then
-          printf "  \033[1;32m* [%-3s]\033[0m %-30s \033[1;32m(active)\033[0m\n" "$id" "$email"
-        else
-          printf "    [%-3s] %-30s\n" "$id" "$email"
-        fi
-        found=1
-      done
-
-      if [ $found -eq 0 ]; then
-        echo "  No accounts found."
-      fi
-      echo "──────────────────────────────────────────────"
-      echo "Usage: agy-switch <id>        Switch active account"
-      echo "       agy-switch add <id>     Add a new account slot"
-      echo "       agy-switch save <id>    Save current login to slot <id>"
-      echo "       agy-switch current      Show current active account"
-    }
-
-    switch_account() {
-      local target_id="$1"
-      local target_dir="$ACCOUNTS_DIR/$target_id"
-
-      if [ ! -d "$target_dir" ] || [ ! -f "$target_dir/antigravity-oauth-token" ]; then
-        echo -e "\033[1;31mError:\033[0m Account '$target_id' not found in $ACCOUNTS_DIR" >&2
-        echo "Run 'agy-switch' to list available accounts." >&2
-        exit 1
-      fi
-
-      sync_current
-
-      cp -f "$target_dir/antigravity-oauth-token" "$ACTIVE_TOKEN"
-      chmod 600 "$ACTIVE_TOKEN"
-
-      local target_email="(no email)"
-      if [ -f "$target_dir/email" ]; then
-        cp -f "$target_dir/email" "$CLI_DIR/.cached_email"
-        target_email=$(cat "$target_dir/email" | tr -d '[:space:]')
-      fi
-
-      echo "$target_id" > "$CURRENT_FILE"
-      echo -e "\033[1;32m✔ Switched to account [$target_id]:\033[0m $target_email"
-    }
-
-    save_account() {
-      local target_id="$1"
-      local target_dir="$ACCOUNTS_DIR/$target_id"
-      mkdir -p "$target_dir"
-
-      if [ ! -f "$ACTIVE_TOKEN" ]; then
-        echo -e "\033[1;31mError:\033[0m No active token found in $ACTIVE_TOKEN" >&2
-        exit 1
-      fi
-
-      cp -f "$ACTIVE_TOKEN" "$target_dir/antigravity-oauth-token"
-      chmod 600 "$target_dir/antigravity-oauth-token"
-
-      local email=""
-      if [ $# -ge 2 ]; then
-        email="$2"
-      elif [ -f "$CLI_DIR/.cached_email" ]; then
-        email=$(cat "$CLI_DIR/.cached_email" | tr -d '[:space:]')
-      fi
-
-      if [ -n "$email" ]; then
-        echo "$email" > "$target_dir/email"
-      fi
-
-      echo "$target_id" > "$CURRENT_FILE"
-      echo -e "\033[1;32m✔ Saved current login as account [$target_id]:\033[0m $email"
-    }
-
-    add_account() {
-      local new_id="$1"
-      local target_dir="$ACCOUNTS_DIR/$new_id"
-
-      if [ -d "$target_dir" ] && [ -f "$target_dir/antigravity-oauth-token" ]; then
-        echo -e "\033[1;33mWarning:\033[0m Account '$new_id' already exists. Use 'agy-switch $new_id' to switch to it, or 'agy-switch save $new_id' to overwrite." >&2
-        exit 1
-      fi
-
-      sync_current
-      rm -f "$ACTIVE_TOKEN" "$CLI_DIR/.cached_email"
-      echo "$new_id" > "$CURRENT_FILE"
-
-      echo -e "\033[1;36mAccount slot [$new_id] prepared.\033[0m"
-      echo "Now run 'agy' to sign in with your Google account."
-      echo "Once logged in, run: agy-switch save $new_id"
-    }
-
-    case "''${1:-}" in
-      "")
-        list_accounts
-        ;;
-      "list"|"-l"|"--list")
-        list_accounts
-        ;;
-      "current"|"whoami"|"status")
-        sync_current
-        cur_id=""
-        [ -f "$CURRENT_FILE" ] && cur_id=$(cat "$CURRENT_FILE" | tr -d '[:space:]')
-        email=""
-        [ -f "$CLI_DIR/.cached_email" ] && email=$(cat "$CLI_DIR/.cached_email" | tr -d '[:space:]')
-        echo "Active account: [$cur_id] $email"
-        ;;
-      "save")
-        if [ $# -lt 2 ]; then
-          echo "Usage: agy-switch save <id> [email]" >&2
-          exit 1
-        fi
-        save_account "$2" "''${3:-}"
-        ;;
-      "add"|"new"|"login")
-        if [ $# -lt 2 ]; then
-          echo "Usage: agy-switch add <id>" >&2
-          exit 1
-        fi
-        add_account "$2"
-        ;;
-      *)
-        switch_account "$1"
-        ;;
-    esac
-  '';
-
-  # agyn: Runner for executing commands using a specific account with declarative settings
   agyn = pkgs.writeShellScriptBin "agyn" ''
-    set -euo pipefail
+        set -euo pipefail
 
-    if [ $# -lt 1 ]; then
-      echo "Usage: agyn <account_id> [agy args...]" >&2
-      echo "Example: agyn 2 -p 'hello'" >&2
-      exit 1
-    fi
+        if [ $# -lt 1 ]; then
+          echo "Usage: agyn <account_id> [agy args...]" >&2
+          echo "Example: agyn 2 -p 'hello'" >&2
+          exit 1
+        fi
 
-    ACCOUNT_ID="$1"
-    shift
+        ACCOUNT_ID="$1"
+        shift
 
-    REAL_HOME="$HOME"
-    ACCOUNT_DIR="$REAL_HOME/.gemini/accounts/$ACCOUNT_ID"
-    TOKEN_FILE="$ACCOUNT_DIR/antigravity-oauth-token"
+        REAL_HOME="$HOME"
+        if [[ "$REAL_HOME" =~ (.*)/\.gemini/accounts/ ]]; then
+          REAL_HOME="''${BASH_REMATCH[1]}"
+        fi
 
-    if [ ! -f "$TOKEN_FILE" ]; then
-      echo -e "\033[1;31mError:\033[0m Account '$ACCOUNT_ID' not found in ~/.gemini/accounts" >&2
-      exit 1
-    fi
+        ACCOUNT_DIR="$REAL_HOME/.gemini/accounts/$ACCOUNT_ID"
+        TOKEN_FILE="$ACCOUNT_DIR/antigravity-oauth-token"
+        PROFILE_HOME="$ACCOUNT_DIR/profile"
+        PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
 
-    PROFILE_HOME="$ACCOUNT_DIR/profile"
-    PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
-    mkdir -p "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini"
+        mkdir -p "$ACCOUNT_DIR" "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini"
 
-    # Symlink declarative home-manager settings so all accounts share the exact same config
-    ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
-    ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
-    ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
-    ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
+        ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
+        ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
+        ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
+        ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
 
-    # Ensure account token and email are synced
-    if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
-      cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
-    fi
+        if [ -f "$TOKEN_FILE" ]; then
+          if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
+            cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
+          fi
+        elif [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
+          cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
+          chmod 600 "$TOKEN_FILE"
+        fi
 
-    if [ -f "$ACCOUNT_DIR/email" ]; then
-      cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
-    fi
+        if [ -f "$ACCOUNT_DIR/email" ]; then
+          cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
+        elif [ -f "$PROFILE_CLI/.cached_email" ]; then
+          cp -f "$PROFILE_CLI/.cached_email" "$ACCOUNT_DIR/email"
+        fi
 
-    cleanup() {
-      if [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
-        cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
-      fi
-    }
-    trap cleanup EXIT INT TERM
+        cleanup() {
+          if [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
+            cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
+            chmod 600 "$TOKEN_FILE"
+          elif [ -f "$TOKEN_FILE" ]; then
+            cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
+            chmod 600 "$PROFILE_CLI/antigravity-oauth-token"
+          fi
 
-    export HOME="$PROFILE_HOME"
-    export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
-    export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
-    export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
-    export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-    export GOPATH="$REAL_HOME/go"
-    export CARGO_HOME="$REAL_HOME/.cargo"
-    export RUSTUP_HOME="$REAL_HOME/.rustup"
+          if [ -f "$TOKEN_FILE" ]; then
+            local email=""
+            if [ -f "$ACCOUNT_DIR/email" ] && [ -s "$ACCOUNT_DIR/email" ]; then
+              email=$(cat "$ACCOUNT_DIR/email" | tr -d '[:space:]')
+            fi
+            if [ -z "$email" ]; then
+              email=$(${pkgs.python3}/bin/python3 - "$TOKEN_FILE" << 'PYEOF' 2>/dev/null || true
+    import sys, json, base64
+    try:
+        with open(sys.argv[1]) as f:
+            data = json.load(f)
+        id_tok = data.get("id_token", "")
+        if id_tok and "." in id_tok:
+            payload = id_tok.split(".")[1]
+            payload += "=" * (-len(payload) % 4)
+            claims = json.loads(base64.urlsafe_b64decode(payload))
+            print(claims.get("email", ""))
+    except Exception:
+        pass
+    PYEOF
+    )
+              if [ -n "$email" ]; then
+                echo "$email" > "$ACCOUNT_DIR/email"
+              fi
+            fi
+            if [ -n "$email" ]; then
+              cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
+            fi
+          fi
+        }
+        trap cleanup EXIT INT TERM
 
-    exec ${antigravityCli}/bin/agy "$@"
+        echo "$ACCOUNT_ID" > "$REAL_HOME/.gemini/accounts/.current" 2>/dev/null || true
+
+        export HOME="$PROFILE_HOME"
+        export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
+        export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
+        export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
+        export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+        export GOPATH="$REAL_HOME/go"
+        export CARGO_HOME="$REAL_HOME/.cargo"
+        export RUSTUP_HOME="$REAL_HOME/.rustup"
+
+        "${antigravityCli}/bin/agy" "$@"
   '';
 
-  # Backward compatibility wrappers: agy2, agy3, ..., agy10
   mkAgyWrapper = id:
     pkgs.writeShellScriptBin "agy${toString id}" ''
       exec ${agyn}/bin/agyn ${toString id} "$@"
     '';
-  agyWrappers = map mkAgyWrapper [2 3 4 5 6 7 8 9 10];
+  agyWrappers = map mkAgyWrapper [1 2 3 4 5 6 7 8 9 10];
 
   # agy-usage: Parallel account usage checker querying ~/.gemini/accounts
   agy-usage = pkgs.writeShellScriptBin "agy-usage" ''
@@ -592,7 +468,6 @@ in {
   home.packages =
     [
       antigravityCli
-      agy-switch
       agyn
       agy-usage
     ]
