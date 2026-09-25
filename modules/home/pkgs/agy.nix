@@ -1,9 +1,50 @@
 {
   config,
   pkgs,
+  inputs ? null,
   ...
 }: let
   homeDir = config.home.homeDirectory;
+
+  playwrightPkg =
+    if inputs != null && inputs ? mcp-servers-nix && inputs.mcp-servers-nix ? packages && inputs.mcp-servers-nix.packages ? ${pkgs.system} && inputs.mcp-servers-nix.packages.${pkgs.system} ? playwright-mcp
+    then inputs.mcp-servers-nix.packages.${pkgs.system}.playwright-mcp
+    else null;
+
+  mcpConfig = {
+    mcpServers = {
+      playwright = {
+        command =
+          if playwrightPkg != null
+          then "${playwrightPkg}/bin/playwright-mcp"
+          else "nix";
+        args =
+          if playwrightPkg != null
+          then [
+            "--browser"
+            "chromium"
+            "--executable-path"
+            "${pkgs.chromium}/bin/chromium"
+          ]
+          else [
+            "run"
+            "github:natsukium/mcp-servers-nix#playwright-mcp"
+            "--"
+            "--executable-path"
+            "${pkgs.chromium}/bin/chromium"
+          ];
+      };
+      nixos = {
+        command = "nix";
+        args = [
+          "run"
+          "github:utensils/mcp-nixos"
+          "--"
+        ];
+      };
+    };
+  };
+
   antigravityCli = pkgs.symlinkJoin {
     name = "antigravity-cli";
     paths = [pkgs.unstable.antigravity-cli];
@@ -14,7 +55,6 @@
     '';
   };
 
-  # Declarative Antigravity settings & preferences
   antigravitySettings = {
     artifactReviewPolicy = "agent-decides";
     editorMode = "vim";
@@ -58,12 +98,13 @@
         PROFILE_HOME="$ACCOUNT_DIR/profile"
         PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
 
-        mkdir -p "$ACCOUNT_DIR" "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini"
+        mkdir -p "$ACCOUNT_DIR" "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini/config"
 
         ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
         ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
         ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
         ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
+        ln -sf "$REAL_HOME/.gemini/config/mcp_config.json" "$PROFILE_HOME/.gemini/config/mcp_config.json"
 
         if [ -f "$TOKEN_FILE" ]; then
           if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
@@ -521,6 +562,11 @@ in {
         preferredEditor = "neovim";
       };
     };
+    force = true;
+  };
+
+  home.file.".gemini/config/mcp_config.json" = {
+    text = builtins.toJSON mcpConfig;
     force = true;
   };
 }
