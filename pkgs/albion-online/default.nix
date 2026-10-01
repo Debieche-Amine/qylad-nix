@@ -15,6 +15,9 @@
   libGL,
   libGLU,
   libglvnd,
+  mesa,
+  libgbm,
+  libdrm,
   vulkan-loader,
   libX11,
   libXau,
@@ -49,6 +52,9 @@
   libsecret,
   dbus,
   udev,
+  sqlite,
+  libgpg-error,
+  e2fsprogs,
   gtk3,
   gdk-pixbuf,
   pango,
@@ -68,7 +74,7 @@
 
     src = fetchurl {
       url = "https://live.albiononline.com/clients/albion-online-setup";
-      sha256 = "16qa0ck2mycp9p8a8jf77hc8q6n4dhbv8bfldh1z38ai1533swna";
+      hash = "sha256-S/vDrKJn28v5weLJHWCqxU5/ozSDCFmETdbtnNlDSW0=";
     };
 
     nativeBuildInputs = [p7zip copyDesktopItems];
@@ -125,6 +131,9 @@
       libGL
       libGLU
       libglvnd
+      mesa
+      libgbm
+      libdrm
       vulkan-loader
       libX11
       libXau
@@ -163,6 +172,9 @@
       libsecret
       dbus
       udev
+      sqlite
+      libgpg-error
+      e2fsprogs
 
       # UI & Fonts
       gtk3

@@ -12,6 +12,7 @@
   inherit (import ../../containers/albion) mkAlbionContainer;
   inherit (import ../../containers/wayland-test) mkWaylandTestContainer;
   inherit (import ../../containers/fabrik) mkFabrikContainer;
+  inherit (import ../../containers/gnome) mkGnomeContainer;
 in {
   imports = [
     ../../modules/system/desktops/hyprland.nix
@@ -88,6 +89,13 @@ in {
     container-wayland-test = mkWaylandTestContainer {
       username = "wayland-test";
       sshPort = 20000;
+    };
+    container-gnome = mkGnomeContainer {
+      username = "gnome";
+      sshPort = 20001;
+      noVncPort = 6080;
+      vncPort = 5900;
+      resolution = "1920x1080";
     };
     # fabrik = mkFabrikContainer {
     #   inherit inputs;
