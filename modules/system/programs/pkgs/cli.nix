@@ -13,6 +13,7 @@
     wget
     git
     btop
+    htop
     intel-gpu-tools
     zip
     unzip
