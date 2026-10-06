@@ -128,6 +128,7 @@ in {
           "${modifier} SHIFT, PRINT, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a -s 1.5"
           "${modifier} CTRL, P, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a -s 1.5"
           "${modifier}, N, exec, ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw"
+          "${modifier} ALT, N, exec, ${pkgs.swaynotificationcenter}/bin/swaync-client --hide-latest -sw"
 
           "${modifier} CTRL, PRINT, exec, ${scripts.screenrecordToggle}/bin/hypr-screenrecord-toggle full"
           "${modifier} CTRL SHIFT, PRINT, exec, ${scripts.screenrecordToggle}/bin/hypr-screenrecord-toggle region"
@@ -196,6 +197,7 @@ in {
         "${modifier}, up, movefocus, u"
         "${modifier}, right, movefocus, r"
         "${modifier}, N, exec, ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw"
+        "${modifier} ALT, N, exec, ${pkgs.swaynotificationcenter}/bin/swaync-client --hide-latest -sw"
       ];
     };
   };

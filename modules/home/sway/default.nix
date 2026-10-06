@@ -234,6 +234,8 @@ in {
           "${modifier}+Shift+x" = "exec swaynag -t warning -m 'Exit Sway?' -B 'Yes' 'swaymsg exit'";
 
           "${modifier}+Escape" = "exec ${scripts.lock}/bin/sway-lock";
+          "${modifier}+n" = "exec ${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw";
+          "${modifier}+Alt+n" = "exec ${pkgs.swaynotificationcenter}/bin/swaync-client --hide-latest -sw";
           "Print" = "exec ${scripts.screenshotFull}/bin/sway-screenshot-full";
           "${modifier}+Print" = "exec ${scripts.screenshotRegion}/bin/sway-screenshot-region";
 

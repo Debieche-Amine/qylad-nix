@@ -22,6 +22,13 @@ in {
   # High performance governor for instant responsiveness
   powerManagement.cpuFreqGovernor = "performance";
 
+  # Enable fine-grained PCIe runtime power management (RTD3/D3cold) for Turing dGPU (GTX 1650)
+  # Drops idle power consumption from ~3W to 0W when not running offloaded tasks
+  hardware.nvidia.powerManagement = {
+    enable = true;
+    finegrained = true;
+  };
+
   # Thermal management daemon to proactively handle thermal zones
   services.thermald.enable = true;
 
