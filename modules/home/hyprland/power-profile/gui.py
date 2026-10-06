@@ -25,35 +25,40 @@ PROFILES = {
         "governor": "performance",
         "epp": "performance",
         "turbo": True,
-        "max_perf_pct": 100,
+        "min_perf_pct": 23,   # 1.1 GHz
+        "max_perf_pct": 100,  # 4.7 GHz
     },
     "balanced": {
         "name": "Balanced",
         "glyph": "󰾆",
         "governor": "powersave",
         "epp": "balance_performance",
-        "turbo": True,
-        "max_perf_pct": 100,
+        "turbo": False,       # Turbo OFF
+        "min_perf_pct": 8,    # 400 MHz
+        "max_perf_pct": 43,   # 2.0 GHz
     },
     "powersaver": {
         "name": "Power Saver",
         "glyph": "󰌪",
         "governor": "powersave",
         "epp": "power",
-        "turbo": False,
-        "max_perf_pct": 70,
+        "turbo": False,       # Turbo OFF
+        "min_perf_pct": 8,    # 400 MHz
+        "max_perf_pct": 17,   # 800 MHz
     },
 }
 
-TIERS = [
+FREQ_TIERS = [
     (8, "400M"),
-    (15, "700M"),
-    (20, "940M"),
-    (25, "1.2G"),
-    (30, "1.4G"),
-    (50, "2.4G"),
-    (70, "3.3G"),
-    (100, "Max"),
+    (17, "800M"),
+    (23, "1.1G"),
+    (34, "1.6G"),
+    (43, "2.0G"),
+    (55, "2.6G"),
+    (64, "3.0G"),
+    (74, "3.5G"),
+    (85, "4.0G"),
+    (100, "4.7G"),
 ]
 
 CSS_TEMPLATE = """
@@ -71,20 +76,20 @@ window {
     background-color: alpha(#181825, 0.85);
     border: 1px solid alpha(#45475a, 0.45);
     border-radius: 14px;
-    padding: 16px;
-    margin: 6px 0;
+    padding: 14px 16px;
+    margin: 4px 0;
 }
 
 .status-card {
     background-color: alpha(#11111b, 0.90);
     border: 1px solid alpha(#89b4fa, 0.35);
     border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 8px;
+    padding: 12px 14px;
+    margin-bottom: 6px;
 }
 
 .status-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: bold;
     color: #89b4fa;
 }
@@ -98,8 +103,8 @@ window {
     background-color: alpha(#313244, 0.7);
     border: 1px solid alpha(#45475a, 0.5);
     border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 9px 12px;
+    font-size: 13px;
     font-weight: 600;
     color: #cdd6f4;
     transition: all 150ms ease;
@@ -120,7 +125,7 @@ window {
     background-color: alpha(#313244, 0.6);
     border: 1px solid alpha(#45475a, 0.4);
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 5px 8px;
     font-size: 12px;
     color: #bac2de;
 }
@@ -139,8 +144,8 @@ window {
 .step-btn {
     background-color: alpha(#313244, 0.7);
     border: 1px solid alpha(#45475a, 0.5);
-    border-radius: 8px;
-    padding: 4px 12px;
+    border-radius: 7px;
+    padding: 2px 10px;
     font-size: 14px;
     font-weight: bold;
     color: #cdd6f4;
@@ -152,11 +157,11 @@ window {
 }
 
 .tier-btn {
-    background-color: alpha(#313244, 0.5);
-    border: 1px solid alpha(#45475a, 0.35);
+    background-color: alpha(#313244, 0.45);
+    border: 1px solid alpha(#45475a, 0.3);
     border-radius: 6px;
-    padding: 4px 6px;
-    font-size: 11px;
+    padding: 3px 2px;
+    font-size: 10px;
     color: #a6adc8;
 }
 
@@ -199,13 +204,13 @@ window {
 
 scale trough {
     background-color: alpha(#313244, 0.8);
-    border-radius: 6px;
-    min-height: 8px;
+    border-radius: 5px;
+    min-height: 7px;
 }
 
 scale highlight {
     background-color: #89b4fa;
-    border-radius: 6px;
+    border-radius: 5px;
 }
 
 switch {
@@ -221,7 +226,13 @@ switch:checked {
 
 def pct_to_freq_str(pct):
     if pct <= 8:
-        return "400 MHz (8% min)"
+        return "400 MHz (8%)"
+    for t_pct, t_label in FREQ_TIERS:
+        if pct == t_pct:
+            if "M" in t_label:
+                return f"{t_label[:-1]} MHz ({pct}%)"
+            else:
+                return f"{t_label[:-1]} GHz ({pct}%)"
     mhz = int(round((pct / 100.0) * 4700))
     if mhz < 1000:
         return f"{mhz} MHz ({pct}%)"
@@ -252,9 +263,10 @@ def get_status():
         "glyph": "󰾆",
         "governor": "powersave",
         "epp": "balance_performance",
-        "turbo": True,
-        "max_perf_pct": 100,
-        "avg_freq_ghz": 2.4,
+        "turbo": False,
+        "min_perf_pct": 8,
+        "max_perf_pct": 43,
+        "avg_freq_ghz": 2.0,
         "temp_c": 50,
     }
 
@@ -263,17 +275,20 @@ class PowerProfileWindow(Gtk.Window):
     def __init__(self):
         super().__init__(title="Power & Performance")
         self.set_wmclass("power-profile-gui", "power-profile-gui")
-        self.set_default_size(580, 640)
+        self.set_default_size(620, 740)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_border_width(16)
 
         self.suppress_events = False
-        self.debounce_timer_id = None
+        self.min_debounce_id = None
+        self.max_debounce_id = None
+
         self.profile_buttons = {}
         self.gov_buttons = {}
         self.epp_buttons = {}
-        self.tier_buttons = {}
+        self.min_tier_buttons = {}
+        self.max_tier_buttons = {}
 
         self.apply_css()
         self.build_ui()
@@ -307,11 +322,11 @@ class PowerProfileWindow(Gtk.Window):
         )
 
     def build_ui(self):
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         self.add(main_box)
 
         # 1. Status Banner
-        self.status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
         self.status_box.get_style_context().add_class("status-card")
 
         self.status_title = Gtk.Label(label="󰾆  Balanced")
@@ -348,9 +363,9 @@ class PowerProfileWindow(Gtk.Window):
         tuning_label = Gtk.Label(label="<b>Fine-Tuning Controls</b>")
         tuning_label.set_use_markup(True)
         tuning_label.set_xalign(0.0)
-        main_box.pack_start(tuning_label, False, False, 4)
+        main_box.pack_start(tuning_label, False, False, 2)
 
-        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=11)
         card.get_style_context().add_class("card")
         main_box.pack_start(card, True, True, 0)
 
@@ -358,7 +373,7 @@ class PowerProfileWindow(Gtk.Window):
         gov_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         gov_lbl = Gtk.Label(label="󰓅  Governor:")
         gov_lbl.set_xalign(0.0)
-        gov_lbl.set_size_request(140, -1)
+        gov_lbl.set_size_request(150, -1)
         gov_box.pack_start(gov_lbl, False, False, 0)
 
         for gov in ["performance", "powersave"]:
@@ -373,7 +388,7 @@ class PowerProfileWindow(Gtk.Window):
         epp_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         epp_lbl = Gtk.Label(label="󱐋  Energy Bias (EPP):")
         epp_lbl.set_xalign(0.0)
-        epp_lbl.set_size_request(140, -1)
+        epp_lbl.set_size_request(150, -1)
         epp_box.pack_start(epp_lbl, False, False, 0)
 
         epp_options = [
@@ -402,59 +417,99 @@ class PowerProfileWindow(Gtk.Window):
         turbo_box.pack_start(self.turbo_switch, False, False, 0)
         card.pack_start(turbo_box, False, False, 0)
 
-        # 3d. Max Clock / Performance Limit
-        perf_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        # 3d. MIN Clock Floor
+        min_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
 
-        perf_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        perf_lbl = Gtk.Label(label="󰾅  Max Clock Limit:")
-        perf_lbl.set_xalign(0.0)
-        perf_header.pack_start(perf_lbl, True, True, 0)
+        min_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        min_lbl = Gtk.Label(label="󰾅  Min Clock (Floor):")
+        min_lbl.set_xalign(0.0)
+        min_header.pack_start(min_lbl, True, True, 0)
 
-        self.scale_val_lbl = Gtk.Label(label="4.70 GHz (100%)")
-        self.scale_val_lbl.set_xalign(1.0)
-        self.scale_val_lbl.get_style_context().add_class("status-subtitle")
-        perf_header.pack_end(self.scale_val_lbl, False, False, 0)
-        perf_card.pack_start(perf_header, False, False, 0)
+        self.min_scale_val_lbl = Gtk.Label(label="400 MHz (8%)")
+        self.min_scale_val_lbl.set_xalign(1.0)
+        self.min_scale_val_lbl.get_style_context().add_class("status-subtitle")
+        min_header.pack_end(self.min_scale_val_lbl, False, False, 0)
+        min_card.pack_start(min_header, False, False, 0)
 
-        # Stepper and Slider
-        scale_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        min_scale_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        min_btn_minus = Gtk.Button(label="−")
+        min_btn_minus.get_style_context().add_class("step-btn")
+        min_btn_minus.connect("clicked", lambda b: self.step_min_scale(-1))
+        min_scale_box.pack_start(min_btn_minus, False, False, 0)
 
-        btn_minus = Gtk.Button(label="−")
-        btn_minus.get_style_context().add_class("step-btn")
-        btn_minus.connect("clicked", lambda b: self.step_scale(-1))
-        scale_box.pack_start(btn_minus, False, False, 0)
+        self.min_scale_adj = Gtk.Adjustment(value=8, lower=1, upper=100, step_increment=1, page_increment=5)
+        self.min_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.min_scale_adj)
+        self.min_scale.set_digits(0)
+        self.min_scale.set_draw_value(False)
+        self.min_scale.connect("value-changed", self.on_min_scale_changed)
+        min_scale_box.pack_start(self.min_scale, True, True, 0)
 
-        self.scale_adjustment = Gtk.Adjustment(value=100, lower=1, upper=100, step_increment=1, page_increment=5)
-        self.scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.scale_adjustment)
-        self.scale.set_digits(0)
-        self.scale.set_draw_value(False)
-        self.scale.connect("value-changed", self.on_scale_changed)
-        scale_box.pack_start(self.scale, True, True, 0)
+        min_btn_plus = Gtk.Button(label="+")
+        min_btn_plus.get_style_context().add_class("step-btn")
+        min_btn_plus.connect("clicked", lambda b: self.step_min_scale(1))
+        min_scale_box.pack_start(min_btn_plus, False, False, 0)
+        min_card.pack_start(min_scale_box, False, False, 0)
 
-        btn_plus = Gtk.Button(label="+")
-        btn_plus.get_style_context().add_class("step-btn")
-        btn_plus.connect("clicked", lambda b: self.step_scale(1))
-        scale_box.pack_start(btn_plus, False, False, 0)
-
-        perf_card.pack_start(scale_box, False, False, 0)
-
-        # Quick Frequency Tiers
-        tier_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        tier_box.set_homogeneous(True)
-
-        for pct, label in TIERS:
+        min_tier_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        min_tier_box.set_homogeneous(True)
+        for pct, label in FREQ_TIERS:
             t_btn = Gtk.Button(label=label)
             t_btn.get_style_context().add_class("tier-btn")
-            t_btn.connect("clicked", self.on_tier_clicked, pct)
-            self.tier_buttons[pct] = t_btn
-            tier_box.pack_start(t_btn, True, True, 0)
+            t_btn.connect("clicked", self.on_min_tier_clicked, pct)
+            self.min_tier_buttons[pct] = t_btn
+            min_tier_box.pack_start(t_btn, True, True, 0)
+        min_card.pack_start(min_tier_box, False, False, 0)
 
-        perf_card.pack_start(tier_box, False, False, 0)
-        card.pack_start(perf_card, False, False, 0)
+        card.pack_start(min_card, False, False, 0)
+
+        # 3e. MAX Clock Ceiling
+        max_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
+
+        max_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        max_lbl = Gtk.Label(label="󰾅  Max Clock (Ceiling):")
+        max_lbl.set_xalign(0.0)
+        max_header.pack_start(max_lbl, True, True, 0)
+
+        self.max_scale_val_lbl = Gtk.Label(label="2.00 GHz (43%)")
+        self.max_scale_val_lbl.set_xalign(1.0)
+        self.max_scale_val_lbl.get_style_context().add_class("status-subtitle")
+        max_header.pack_end(self.max_scale_val_lbl, False, False, 0)
+        max_card.pack_start(max_header, False, False, 0)
+
+        max_scale_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        max_btn_minus = Gtk.Button(label="−")
+        max_btn_minus.get_style_context().add_class("step-btn")
+        max_btn_minus.connect("clicked", lambda b: self.step_max_scale(-1))
+        max_scale_box.pack_start(max_btn_minus, False, False, 0)
+
+        self.max_scale_adj = Gtk.Adjustment(value=43, lower=1, upper=100, step_increment=1, page_increment=5)
+        self.max_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.max_scale_adj)
+        self.max_scale.set_digits(0)
+        self.max_scale.set_draw_value(False)
+        self.max_scale.connect("value-changed", self.on_max_scale_changed)
+        max_scale_box.pack_start(self.max_scale, True, True, 0)
+
+        max_btn_plus = Gtk.Button(label="+")
+        max_btn_plus.get_style_context().add_class("step-btn")
+        max_btn_plus.connect("clicked", lambda b: self.step_max_scale(1))
+        max_scale_box.pack_start(max_btn_plus, False, False, 0)
+        max_card.pack_start(max_scale_box, False, False, 0)
+
+        max_tier_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+        max_tier_box.set_homogeneous(True)
+        for pct, label in FREQ_TIERS:
+            t_btn = Gtk.Button(label=label)
+            t_btn.get_style_context().add_class("tier-btn")
+            t_btn.connect("clicked", self.on_max_tier_clicked, pct)
+            self.max_tier_buttons[pct] = t_btn
+            max_tier_box.pack_start(t_btn, True, True, 0)
+        max_card.pack_start(max_tier_box, False, False, 0)
+
+        card.pack_start(max_card, False, False, 0)
 
         # 4. Action Buttons (Reset & Close)
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        actions_box.set_margin_top(6)
+        actions_box.set_margin_top(4)
 
         reset_btn = Gtk.Button(label="󰦛  Reset to Baseline")
         reset_btn.get_style_context().add_class("reset-btn")
@@ -503,14 +558,23 @@ class PowerProfileWindow(Gtk.Window):
                 btn.get_style_context().remove_class("active")
 
         # Turbo switch
-        self.turbo_switch.set_active(st.get("turbo", True))
+        self.turbo_switch.set_active(st.get("turbo", False))
 
-        # Max perf scale & tiers
-        max_pct = st.get("max_perf_pct", 100)
-        self.scale.set_value(max_pct)
-        self.scale_val_lbl.set_text(pct_to_freq_str(max_pct))
+        # Min scale & tiers
+        min_pct = st.get("min_perf_pct", 8)
+        self.min_scale.set_value(min_pct)
+        self.min_scale_val_lbl.set_text(pct_to_freq_str(min_pct))
+        for pct, btn in self.min_tier_buttons.items():
+            if pct == min_pct:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
 
-        for pct, btn in self.tier_buttons.items():
+        # Max scale & tiers
+        max_pct = st.get("max_perf_pct", 43)
+        self.max_scale.set_value(max_pct)
+        self.max_scale_val_lbl.set_text(pct_to_freq_str(max_pct))
+        for pct, btn in self.max_tier_buttons.items():
             if pct == max_pct:
                 btn.get_style_context().add_class("active")
             else:
@@ -532,8 +596,15 @@ class PowerProfileWindow(Gtk.Window):
             else:
                 btn.get_style_context().remove_class("active")
 
-        max_pct = int(self.scale.get_value())
-        for pct, btn in self.tier_buttons.items():
+        min_pct = int(self.min_scale.get_value())
+        for pct, btn in self.min_tier_buttons.items():
+            if pct == min_pct:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        max_pct = int(self.max_scale.get_value())
+        for pct, btn in self.max_tier_buttons.items():
             if pct == max_pct:
                 btn.get_style_context().add_class("active")
             else:
@@ -567,43 +638,84 @@ class PowerProfileWindow(Gtk.Window):
         self.refresh_ui()
         return False
 
-    def step_scale(self, delta):
-        curr = int(self.scale.get_value())
+    def step_min_scale(self, delta):
+        curr = int(self.min_scale.get_value())
         new_val = max(1, min(100, curr + delta))
-        self.scale.set_value(new_val)
+        self.min_scale.set_value(new_val)
 
-    def on_tier_clicked(self, widget, pct):
-        self.scale.set_value(pct)
+    def on_min_tier_clicked(self, widget, pct):
+        self.min_scale.set_value(pct)
 
-    def on_scale_changed(self, scale):
+    def on_min_scale_changed(self, scale):
         if self.suppress_events:
             return
         val = int(scale.get_value())
-        # Instantly update label (silky smooth, zero latency!)
-        self.scale_val_lbl.set_text(pct_to_freq_str(val))
+        self.min_scale_val_lbl.set_text(pct_to_freq_str(val))
 
-        # Update tier buttons highlight
-        for pct, btn in self.tier_buttons.items():
+        # Clamp max if min > max
+        max_val = int(self.max_scale.get_value())
+        if val > max_val:
+            self.suppress_events = True
+            self.max_scale.set_value(val)
+            self.max_scale_val_lbl.set_text(pct_to_freq_str(val))
+            self.suppress_events = False
+
+        for pct, btn in self.min_tier_buttons.items():
             if pct == val:
                 btn.get_style_context().add_class("active")
             else:
                 btn.get_style_context().remove_class("active")
 
-        # Cancel previous timer
-        if self.debounce_timer_id is not None:
-            GLib.source_remove(self.debounce_timer_id)
-            self.debounce_timer_id = None
+        if self.min_debounce_id is not None:
+            GLib.source_remove(self.min_debounce_id)
+            self.min_debounce_id = None
 
-        # Debounce writing to hardware by 250ms so slider moves completely freely
-        self.debounce_timer_id = GLib.timeout_add(250, self.apply_scale_debounced, val)
+        self.min_debounce_id = GLib.timeout_add(250, self.apply_limits_debounced)
 
-    def apply_scale_debounced(self, val):
-        self.debounce_timer_id = None
-        threading.Thread(target=self._async_set_scale, args=(val,), daemon=True).start()
+    def step_max_scale(self, delta):
+        curr = int(self.max_scale.get_value())
+        new_val = max(1, min(100, curr + delta))
+        self.max_scale.set_value(new_val)
+
+    def on_max_tier_clicked(self, widget, pct):
+        self.max_scale.set_value(pct)
+
+    def on_max_scale_changed(self, scale):
+        if self.suppress_events:
+            return
+        val = int(scale.get_value())
+        self.max_scale_val_lbl.set_text(pct_to_freq_str(val))
+
+        # Clamp min if max < min
+        min_val = int(self.min_scale.get_value())
+        if val < min_val:
+            self.suppress_events = True
+            self.min_scale.set_value(val)
+            self.min_scale_val_lbl.set_text(pct_to_freq_str(val))
+            self.suppress_events = False
+
+        for pct, btn in self.max_tier_buttons.items():
+            if pct == val:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        if self.max_debounce_id is not None:
+            GLib.source_remove(self.max_debounce_id)
+            self.max_debounce_id = None
+
+        self.max_debounce_id = GLib.timeout_add(250, self.apply_limits_debounced)
+
+    def apply_limits_debounced(self):
+        self.min_debounce_id = None
+        self.max_debounce_id = None
+        min_v = int(self.min_scale.get_value())
+        max_v = int(self.max_scale.get_value())
+        threading.Thread(target=self._async_set_limits, args=(min_v, max_v), daemon=True).start()
         return False
 
-    def _async_set_scale(self, val):
-        run_ctl(["set-param", "--max-perf-pct", str(val)])
+    def _async_set_limits(self, min_v, max_v):
+        run_ctl(["set-param", "--min-perf-pct", str(min_v), "--max-perf-pct", str(max_v)])
         GLib.idle_add(self.refresh_status_only)
 
     def on_reset_clicked(self, widget):

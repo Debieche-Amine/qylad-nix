@@ -49,7 +49,7 @@ in {
           "${modifier} SHIFT, G, exec, ${scripts.restrictedMode}/bin/hypr-restricted-mode enter"
           "${modifier}, D, exec, ${menu}"
           "${modifier}, C, exec, hypr-control-panel"
-          "${modifier}, E, exec, power-profile-gui"
+          "${modifier}, X, exec, power-profile-gui"
           "${modifier}, Q, killactive"
 
           "${modifier}, H, movefocus, l"

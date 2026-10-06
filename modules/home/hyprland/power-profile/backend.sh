@@ -4,7 +4,7 @@ set -euo pipefail
 ACTION="${1:-}"
 
 if [ "$ACTION" != "apply" ]; then
-    echo "Usage: power-profile-backend apply <governor> <epp> <no_turbo> <max_perf_pct>" >&2
+    echo "Usage: power-profile-backend apply <governor> <epp> <no_turbo> <max_perf_pct> [min_perf_pct]" >&2
     exit 1
 fi
 
@@ -12,6 +12,7 @@ GOV="${2:-powersave}"
 EPP="${3:-balance_performance}"
 NO_TURBO="${4:-0}"
 MAX_PERF="${5:-100}"
+MIN_PERF="${6:-8}"
 
 # Validate inputs
 if [[ "$GOV" != "performance" && "$GOV" != "powersave" ]]; then
@@ -34,6 +35,16 @@ if ! [[ "$MAX_PERF" =~ ^[0-9]+$ ]] || [ "$MAX_PERF" -lt 1 ] || [ "$MAX_PERF" -gt
     exit 1
 fi
 
+if ! [[ "$MIN_PERF" =~ ^[0-9]+$ ]] || [ "$MIN_PERF" -lt 1 ] || [ "$MIN_PERF" -gt 100 ]; then
+    echo "Invalid min_perf_pct: $MIN_PERF" >&2
+    exit 1
+fi
+
+# Ensure min does not exceed max
+if [ "$MIN_PERF" -gt "$MAX_PERF" ]; then
+    MIN_PERF="$MAX_PERF"
+fi
+
 # Apply Governor
 for p in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
     [ -f "$p" ] && echo "$GOV" > "$p" 2>/dev/null || true
@@ -49,7 +60,9 @@ if [ -f /sys/devices/system/cpu/intel_pstate/no_turbo ]; then
     echo "$NO_TURBO" > /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
 fi
 
-# Apply Max Perf Pct
-if [ -f /sys/devices/system/cpu/intel_pstate/max_perf_pct ]; then
+# Apply Min and Max Perf Pct safely in bidirectional order
+if [ -f /sys/devices/system/cpu/intel_pstate/min_perf_pct ] && [ -f /sys/devices/system/cpu/intel_pstate/max_perf_pct ]; then
+    echo "$MIN_PERF" > /sys/devices/system/cpu/intel_pstate/min_perf_pct 2>/dev/null || true
     echo "$MAX_PERF" > /sys/devices/system/cpu/intel_pstate/max_perf_pct 2>/dev/null || true
+    echo "$MIN_PERF" > /sys/devices/system/cpu/intel_pstate/min_perf_pct 2>/dev/null || true
 fi

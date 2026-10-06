@@ -11,6 +11,18 @@ STATE_FILE = os.path.join(
     "power-profile-state.json"
 )
 
+# Frequency mappings (based on 4.70 GHz maximum turbo):
+# 8%  = 400 MHz (hardware minimum floor)
+# 17% = 800 MHz
+# 23% = 1.1 GHz
+# 34% = 1.6 GHz
+# 43% = 2.0 GHz
+# 55% = 2.6 GHz
+# 64% = 3.0 GHz
+# 74% = 3.5 GHz
+# 85% = 4.0 GHz
+# 100% = 4.7 GHz (max turbo)
+
 PROFILES = {
     "performance": {
         "name": "Performance",
@@ -19,7 +31,8 @@ PROFILES = {
         "governor": "performance",
         "epp": "performance",
         "turbo": True,
-        "max_perf_pct": 100,
+        "min_perf_pct": 23,   # 1.1 GHz
+        "max_perf_pct": 100,  # 4.7 GHz (max)
     },
     "balanced": {
         "name": "Balanced",
@@ -27,8 +40,9 @@ PROFILES = {
         "short": "Bal",
         "governor": "powersave",
         "epp": "balance_performance",
-        "turbo": True,
-        "max_perf_pct": 100,
+        "turbo": False,       # Turbo OFF
+        "min_perf_pct": 8,    # 400 MHz
+        "max_perf_pct": 43,   # 2.0 GHz
     },
     "powersaver": {
         "name": "Power Saver",
@@ -36,8 +50,9 @@ PROFILES = {
         "short": "Eco",
         "governor": "powersave",
         "epp": "power",
-        "turbo": False,
-        "max_perf_pct": 70,
+        "turbo": False,       # Turbo OFF
+        "min_perf_pct": 8,    # 400 MHz
+        "max_perf_pct": 17,   # 800 MHz
     },
 }
 
@@ -66,6 +81,13 @@ def get_hw_state():
     epp = read_sysfs("/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference", "balance_performance")
     no_turbo = read_sysfs("/sys/devices/system/cpu/intel_pstate/no_turbo", "0")
     turbo = (no_turbo == "0")
+
+    min_perf = read_sysfs("/sys/devices/system/cpu/intel_pstate/min_perf_pct", "8")
+    try:
+        min_perf_pct = int(min_perf)
+    except ValueError:
+        min_perf_pct = 8
+
     max_perf = read_sysfs("/sys/devices/system/cpu/intel_pstate/max_perf_pct", "100")
     try:
         max_perf_pct = int(max_perf)
@@ -89,7 +111,6 @@ def get_hw_state():
 
     # CPU Temp
     temp_c = 0
-    # Try thermal zones or hwmon
     for tz in glob.glob("/sys/class/thermal/thermal_zone*/temp"):
         try:
             t = int(read_sysfs(tz, "0"))
@@ -103,6 +124,7 @@ def get_hw_state():
         "governor": gov,
         "epp": epp,
         "turbo": turbo,
+        "min_perf_pct": min_perf_pct,
         "max_perf_pct": max_perf_pct,
         "avg_freq_ghz": round(avg_freq_mhz / 1000.0, 2),
         "temp_c": temp_c,
@@ -134,7 +156,8 @@ def match_profile(hw):
             hw["governor"] == p["governor"]
             and hw["epp"] == p["epp"]
             and hw["turbo"] == p["turbo"]
-            and hw["max_perf_pct"] == p["max_perf_pct"]
+            and abs(hw["min_perf_pct"] - p["min_perf_pct"]) <= 1
+            and abs(hw["max_perf_pct"] - p["max_perf_pct"]) <= 1
         ):
             return key
     return "custom"
@@ -147,9 +170,13 @@ def notify_waybar():
         pass
 
 
-def apply_hw_settings(gov, epp, turbo, max_perf_pct):
+def apply_hw_settings(gov, epp, turbo, max_perf_pct, min_perf_pct):
     no_turbo = "0" if turbo else "1"
-    # Check if we have write access directly
+    # Ensure min <= max
+    if min_perf_pct > max_perf_pct:
+        min_perf_pct = max_perf_pct
+
+    # Check if direct write is permitted
     direct = True
     for p in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/scaling_governor"):
         if not write_sysfs(p, gov):
@@ -160,10 +187,11 @@ def apply_hw_settings(gov, epp, turbo, max_perf_pct):
         for p in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference"):
             write_sysfs(p, epp)
         write_sysfs("/sys/devices/system/cpu/intel_pstate/no_turbo", no_turbo)
+        write_sysfs("/sys/devices/system/cpu/intel_pstate/min_perf_pct", str(min_perf_pct))
         write_sysfs("/sys/devices/system/cpu/intel_pstate/max_perf_pct", str(max_perf_pct))
+        write_sysfs("/sys/devices/system/cpu/intel_pstate/min_perf_pct", str(min_perf_pct))
     else:
-        # Use privileged backend
-        cmd = ["sudo", BACKEND_BIN, "apply", gov, epp, no_turbo, str(max_perf_pct)]
+        cmd = ["sudo", BACKEND_BIN, "apply", gov, epp, no_turbo, str(max_perf_pct), str(min_perf_pct)]
         subprocess.run(cmd, check=True)
 
     notify_waybar()
@@ -174,7 +202,7 @@ def set_profile(name):
         print(f"Unknown profile: {name}", file=sys.stderr)
         sys.exit(1)
     p = PROFILES[name]
-    apply_hw_settings(p["governor"], p["epp"], p["turbo"], p["max_perf_pct"])
+    apply_hw_settings(p["governor"], p["epp"], p["turbo"], p["max_perf_pct"], p["min_perf_pct"])
     state = load_state()
     state["base_profile"] = name
     save_state(state)
@@ -186,9 +214,9 @@ def set_param(args):
     epp = args.epp or hw["epp"]
     turbo = args.turbo if args.turbo is not None else hw["turbo"]
     max_perf_pct = args.max_perf_pct if args.max_perf_pct is not None else hw["max_perf_pct"]
+    min_perf_pct = args.min_perf_pct if args.min_perf_pct is not None else hw["min_perf_pct"]
 
-    apply_hw_settings(gov, epp, turbo, max_perf_pct)
-    # Check if this matches base_profile or custom
+    apply_hw_settings(gov, epp, turbo, max_perf_pct, min_perf_pct)
     state = load_state()
     save_state(state)
 
@@ -197,6 +225,16 @@ def reset_to_base():
     state = load_state()
     base = state.get("base_profile", "balanced")
     set_profile(base)
+
+
+def pct_to_freq_label(pct):
+    if pct <= 8:
+        return "400 MHz"
+    mhz = int(round((pct / 100.0) * 4700))
+    if mhz < 1000:
+        return f"{mhz} MHz"
+    else:
+        return f"{mhz / 1000.0:.1f} GHz"
 
 
 def get_full_status():
@@ -225,6 +263,7 @@ def get_full_status():
         "governor": hw["governor"],
         "epp": hw["epp"],
         "turbo": hw["turbo"],
+        "min_perf_pct": hw["min_perf_pct"],
         "max_perf_pct": hw["max_perf_pct"],
         "avg_freq_ghz": hw["avg_freq_ghz"],
         "temp_c": hw["temp_c"],
@@ -235,10 +274,12 @@ def print_waybar():
     st = get_full_status()
     text = f"{st['glyph']}  {st['short']}"
     turbo_str = "ON" if st["turbo"] else "OFF"
+    min_str = pct_to_freq_label(st['min_perf_pct'])
+    max_str = pct_to_freq_label(st['max_perf_pct'])
     tooltip = (
         f"Profile: {st['display_name']}\n"
         f"Governor: {st['governor']}  |  EPP: {st['epp']}\n"
-        f"Turbo: {turbo_str}  |  Max Perf: {st['max_perf_pct']}%\n"
+        f"Limits: {min_str} – {max_str} (Turbo: {turbo_str})\n"
         f"CPU: {st['avg_freq_ghz']:.2f} GHz  |  Temp: {st['temp_c']}°C"
     )
     out = {
@@ -263,6 +304,7 @@ def main():
     sp_param.add_argument("--governor", choices=["performance", "powersave"])
     sp_param.add_argument("--epp", choices=["performance", "balance_performance", "balance_power", "power"])
     sp_param.add_argument("--turbo", type=lambda x: x.lower() in ("1", "true", "yes", "on"))
+    sp_param.add_argument("--min-perf-pct", type=int)
     sp_param.add_argument("--max-perf-pct", type=int)
 
     # reset
