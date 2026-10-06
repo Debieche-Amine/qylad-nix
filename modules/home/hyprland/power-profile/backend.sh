@@ -29,7 +29,7 @@ if [[ "$NO_TURBO" != "0" && "$NO_TURBO" != "1" ]]; then
     exit 1
 fi
 
-if ! [[ "$MAX_PERF" =~ ^[0-9]+$ ]] || [ "$MAX_PERF" -lt 10 ] || [ "$MAX_PERF" -gt 100 ]; then
+if ! [[ "$MAX_PERF" =~ ^[0-9]+$ ]] || [ "$MAX_PERF" -lt 1 ] || [ "$MAX_PERF" -gt 100 ]; then
     echo "Invalid max_perf_pct: $MAX_PERF" >&2
     exit 1
 fi

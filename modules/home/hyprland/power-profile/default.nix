@@ -175,6 +175,18 @@
   };
 
   powerProfileGui = pkgs.writeShellScriptBin "power-profile-gui" ''
+    active_class="$(${pkgs.hyprland}/bin/hyprctl activewindow -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.class // empty')"
+    if [ "$active_class" = "power-profile-gui" ]; then
+      ${pkgs.hyprland}/bin/hyprctl dispatch closewindow "class:power-profile-gui"
+      exit 0
+    fi
+
+    existing="$(${pkgs.hyprland}/bin/hyprctl clients -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[] | select(.class == "power-profile-gui") | .address' | head -n 1)"
+    if [ -n "$existing" ]; then
+      ${pkgs.hyprland}/bin/hyprctl dispatch focuswindow "address:$existing"
+      exit 0
+    fi
+
     export POWER_PROFILE_CTL_BIN="${powerProfileCtl}/bin/power-profile-ctl"
     export POWER_PROFILE_CSS="${stylixCss}"
     exec ${powerProfileGuiRaw}/bin/power-profile-gui-raw "$@"

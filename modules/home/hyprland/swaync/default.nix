@@ -82,24 +82,18 @@ in {
           actions = [
             {
               label = "󰓅  Perf";
-              type = "toggle";
-              active = false;
-              command = "power-profile-ctl set-profile performance";
-              update-command = "power-profile-ctl is performance && echo true || echo false";
+              type = "normal";
+              command = "power-profile-ctl set-profile performance && ${pkgs.libnotify}/bin/notify-send -a 'Power' 'Power Profile' '󰓅  Performance Active' -t 1200";
             }
             {
               label = "󰾆  Bal";
-              type = "toggle";
-              active = false;
-              command = "power-profile-ctl set-profile balanced";
-              update-command = "power-profile-ctl is balanced && echo true || echo false";
+              type = "normal";
+              command = "power-profile-ctl set-profile balanced && ${pkgs.libnotify}/bin/notify-send -a 'Power' 'Power Profile' '󰾆  Balanced Active' -t 1200";
             }
             {
               label = "󰌪  Eco";
-              type = "toggle";
-              active = false;
-              command = "power-profile-ctl set-profile powersaver";
-              update-command = "power-profile-ctl is powersaver && echo true || echo false";
+              type = "normal";
+              command = "power-profile-ctl set-profile powersaver && ${pkgs.libnotify}/bin/notify-send -a 'Power' 'Power Profile' '󰌪  Power Saver Active' -t 1200";
             }
           ];
         };

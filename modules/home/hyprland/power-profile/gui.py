@@ -216,8 +216,17 @@ class PowerProfileWindow(Gtk.Window):
         self.build_ui()
         self.refresh_ui()
 
+        # Close on Escape key
+        self.connect("key-press-event", self.on_key_press)
+
         # Poll every 2 seconds for live clock/temp and sync
         GLib.timeout_add_seconds(2, self.on_poll_timer)
+
+    def on_key_press(self, widget, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.destroy()
+            return True
+        return False
 
     def apply_css(self):
         css_provider = Gtk.CssProvider()
@@ -337,7 +346,7 @@ class PowerProfileWindow(Gtk.Window):
         perf_lbl.set_size_request(140, -1)
         perf_box.pack_start(perf_lbl, False, False, 0)
 
-        self.scale_adjustment = Gtk.Adjustment(value=100, lower=30, upper=100, step_increment=5, page_increment=10)
+        self.scale_adjustment = Gtk.Adjustment(value=100, lower=1, upper=100, step_increment=1, page_increment=5)
         self.scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.scale_adjustment)
         self.scale.set_digits(0)
         self.scale.set_draw_value(False)
