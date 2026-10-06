@@ -159,21 +159,6 @@ in {
         movefocus_cycles_fullscreen = true;
       };
 
-      gestures = {
-        workspace_swipe_distance = 320;
-        workspace_swipe_cancel_ratio = 0.35;
-        workspace_swipe_min_speed_to_force = 18;
-        workspace_swipe_forever = true;
-      };
-
-      gesture = [
-        "3, horizontal, workspace"
-        "4, down, special, scratchpad"
-        "4, up, fullscreen, fullscreen"
-        "4, left, dispatcher, movefocus, l"
-        "4, right, dispatcher, movefocus, r"
-      ];
-
       dwindle = {
         preserve_split = true;
         smart_split = false;
