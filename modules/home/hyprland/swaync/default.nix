@@ -47,6 +47,8 @@ in {
         "backlight"
         "buttons-grid#quick-toggles"
         "buttons-grid#power-profiles"
+        "label#sleep-timer"
+        "buttons-grid#sleep-timer"
         "title"
         "notifications"
         "mpris"
@@ -58,6 +60,55 @@ in {
           button-text = "Clear All";
         };
         dnd.text = "Do Not Disturb";
+        "label#sleep-timer" = {
+          max-lines = 1;
+          text = "󰔛  Sleep Timer";
+        };
+        "buttons-grid#sleep-timer" = {
+          buttons-per-row = 4;
+          actions = [
+            {
+              label = "+2m";
+              type = "normal";
+              command = "hypr-sleep-timer add 2m";
+            }
+            {
+              label = "+5m";
+              type = "normal";
+              command = "hypr-sleep-timer add 5m";
+            }
+            {
+              label = "+15m";
+              type = "normal";
+              command = "hypr-sleep-timer add 15m";
+            }
+            {
+              label = "+45m";
+              type = "normal";
+              command = "hypr-sleep-timer add 45m";
+            }
+            {
+              label = "+3h";
+              type = "normal";
+              command = "hypr-sleep-timer add 3h";
+            }
+            {
+              label = "+12h";
+              type = "normal";
+              command = "hypr-sleep-timer add 12h";
+            }
+            {
+              label = "+2d";
+              type = "normal";
+              command = "hypr-sleep-timer add 2d";
+            }
+            {
+              label = "󰅖 Reset";
+              type = "normal";
+              command = "hypr-sleep-timer cancel";
+            }
+          ];
+        };
         "buttons-grid#quick-toggles" = {
           buttons-per-row = 2;
           actions = [

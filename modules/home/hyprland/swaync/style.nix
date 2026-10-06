@@ -150,6 +150,17 @@
     color: @base00;
   }
 
+  /* Section Labels */
+  .widget-label {
+    margin: 10px 4px 2px 4px;
+  }
+
+  .widget-label label {
+    font-size: 13px;
+    font-weight: bold;
+    color: @base0D;
+  }
+
   /* DND Switch Widget */
   .widget-dnd {
     background: alpha(@base01, 0.65);

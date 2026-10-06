@@ -38,6 +38,7 @@ in {
     "pulseaudio"
     "battery"
     "custom/power-profile"
+    "custom/sleep-timer"
     "hyprland/language"
     "custom/notification"
   ];
@@ -239,6 +240,16 @@ in {
     interval = 3;
     signal = 8;
     on-click = "${uwsm} app -- power-profile-gui";
+    tooltip = true;
+  };
+
+  "custom/sleep-timer" = {
+    exec = "hypr-sleep-timer waybar";
+    return-type = "json";
+    interval = 1;
+    signal = 10;
+    on-click = "${pkgs.swaynotificationcenter}/bin/swaync-client -t -sw";
+    on-click-right = "hypr-sleep-timer cancel";
     tooltip = true;
   };
 

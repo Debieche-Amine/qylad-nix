@@ -16,6 +16,7 @@
     ./rules.nix
     ./services.nix
     ./settings.nix
+    ./sleep-timer.nix
     ./swaync
     ./waybar
     ./wlogout.nix
