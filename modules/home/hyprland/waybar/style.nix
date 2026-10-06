@@ -54,7 +54,6 @@
   #custom-mic,
   #battery,
   #custom-power-profile,
-  #custom-sleep-timer,
   #language,
   #tray,
   #custom-notification {
@@ -191,12 +190,16 @@
     color: @amber;
   }
 
-  #custom-sleep-timer {
+  #custom-sleep-timer.active {
+    background: @bg;
+    border: 1px solid alpha(@muted, 0.18);
+    border-radius: 12px;
+    padding: 0 11px;
     color: @amber;
     font-weight: 700;
   }
 
-  #custom-sleep-timer:hover {
+  #custom-sleep-timer.active:hover {
     background: @amber;
     color: @base00;
   }
