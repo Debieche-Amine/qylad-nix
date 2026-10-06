@@ -60,7 +60,8 @@
     background: @bg;
     border: 1px solid alpha(@muted, 0.18);
     border-radius: 12px;
-    padding: 0 11px;
+    padding: 3px 11px;
+    min-height: 26px;
   }
 
   #custom-logo {
@@ -80,7 +81,8 @@
     background: alpha(@red, 0.22);
     border: 1px solid alpha(@red, 0.65);
     border-radius: 12px;
-    padding: 0 11px;
+    padding: 3px 11px;
+    min-height: 26px;
     color: @red;
     font-weight: 700;
   }
@@ -194,7 +196,8 @@
     background: @bg;
     border: 1px solid alpha(@muted, 0.18);
     border-radius: 12px;
-    padding: 0 11px;
+    padding: 3px 11px;
+    min-height: 26px;
     color: @amber;
     font-weight: 700;
   }
