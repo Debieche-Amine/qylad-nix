@@ -17,11 +17,9 @@ in {
   spacing = 5;
 
   modules-left = [
-    "custom/logo"
-    "hyprland/workspaces"
-    # "hyprland/submap"
+    "hyprland/submap"
     # "custom/scratchpad"
-    # "custom/recorder"
+    "custom/recorder"
     "cpu"
     "memory"
     "temperature"
@@ -30,6 +28,7 @@ in {
   ];
   modules-center = [
     "clock"
+    "custom/sleep-timer"
   ];
   modules-right = [
     "custom/netusage"
@@ -38,7 +37,6 @@ in {
     "backlight"
     "battery"
     "custom/power-profile"
-    "custom/sleep-timer"
     "hyprland/language"
     "custom/notification"
   ];
