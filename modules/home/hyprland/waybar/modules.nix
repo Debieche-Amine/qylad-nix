@@ -19,23 +19,23 @@ in {
   modules-left = [
     "custom/logo"
     "hyprland/workspaces"
-    "hyprland/submap"
-    "custom/scratchpad"
-    "custom/recorder"
+    # "hyprland/submap"
+    # "custom/scratchpad"
+    # "custom/recorder"
+    "cpu"
+    "memory"
+    "temperature"
+    "disk"
+    "mpris"
   ];
   modules-center = [
     "clock"
   ];
   modules-right = [
-    "mpris"
-    "cpu"
-    "memory"
-    "disk"
-    "temperature"
     "custom/netusage"
     "network"
-    "backlight"
     "pulseaudio"
+    "backlight"
     "battery"
     "custom/power-profile"
     "custom/sleep-timer"
