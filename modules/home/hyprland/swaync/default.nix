@@ -46,6 +46,7 @@ in {
         "volume"
         "backlight"
         "buttons-grid#quick-toggles"
+        "buttons-grid#power-profiles"
         "title"
         "notifications"
         "mpris"
@@ -73,6 +74,32 @@ in {
               active = false;
               command = "${scripts.idleInhibitToggle}/bin/hypr-idle-inhibit-toggle";
               update-command = "${pkgs.systemd}/bin/systemctl --user is-active --quiet swaync-idle-inhibit.service && echo true || echo false";
+            }
+          ];
+        };
+        "buttons-grid#power-profiles" = {
+          buttons-per-row = 3;
+          actions = [
+            {
+              label = "󰓅  Perf";
+              type = "toggle";
+              active = false;
+              command = "power-profile-ctl set-profile performance";
+              update-command = "power-profile-ctl is performance && echo true || echo false";
+            }
+            {
+              label = "󰾆  Bal";
+              type = "toggle";
+              active = false;
+              command = "power-profile-ctl set-profile balanced";
+              update-command = "power-profile-ctl is balanced && echo true || echo false";
+            }
+            {
+              label = "󰌪  Eco";
+              type = "toggle";
+              active = false;
+              command = "power-profile-ctl set-profile powersaver";
+              update-command = "power-profile-ctl is powersaver && echo true || echo false";
             }
           ];
         };

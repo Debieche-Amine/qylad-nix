@@ -1,4 +1,24 @@
-{pkgs, ...}: {
+{pkgs, ...}: let
+  powerProfileBackend = pkgs.writeShellScriptBin "power-profile-backend" (builtins.readFile ../../modules/home/hyprland/power-profile/backend.sh);
+in {
+  environment.systemPackages = [powerProfileBackend];
+
+  security.sudo.extraRules = [
+    {
+      users = ["qylad"];
+      commands = [
+        {
+          command = "${powerProfileBackend}/bin/power-profile-backend";
+          options = ["NOPASSWD"];
+        }
+        {
+          command = "/run/current-system/sw/bin/power-profile-backend";
+          options = ["NOPASSWD"];
+        }
+      ];
+    }
+  ];
+
   # High performance governor for instant responsiveness
   powerManagement.cpuFreqGovernor = "performance";
 
@@ -11,7 +31,7 @@
     extraConfig = ''
       [GENERAL]
       Enabled: True
-      Sysfs_Power_Path: /sys/class/power_supply/AC*/online
+      Sysfs_Power_Path: /sys/class/power_supply/ADP1/online
       Autoreload: True
 
       [AC]

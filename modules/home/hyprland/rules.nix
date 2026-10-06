@@ -25,6 +25,7 @@
       "match:title ^(Open File|Save File|Select a File|File Upload)$, float on, center on"
       "match:class ^(excalidraw)$, workspace special:s1, fullscreen on"
       "match:class ^(hypr-control-panel)$, float on, size 1360 780, center on"
+      "match:class ^(power-profile-gui)$, float on, size 540 620, center on"
     ];
 
     layerrule = [

@@ -37,6 +37,7 @@ in {
     "backlight"
     "pulseaudio"
     "battery"
+    "custom/power-profile"
     "hyprland/language"
     "custom/notification"
   ];
@@ -229,6 +230,16 @@ in {
     format-plugged = "  {capacity}%";
     format-icons = ["" "" "" "" ""];
     tooltip-format = "{timeTo}\nPower: {power} W";
+  };
+
+  "custom/power-profile" = {
+    format = "{}";
+    return-type = "json";
+    exec = "power-profile-ctl waybar";
+    interval = 3;
+    signal = 8;
+    on-click = "${uwsm} app -- power-profile-gui";
+    tooltip = true;
   };
 
   "hyprland/language" = {

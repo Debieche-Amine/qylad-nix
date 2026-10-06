@@ -53,6 +53,7 @@
   #pulseaudio,
   #custom-mic,
   #battery,
+  #custom-power-profile,
   #language,
   #tray,
   #custom-notification {
@@ -171,5 +172,21 @@
   #network.disconnected,
   #pulseaudio.muted {
     color: @muted;
+  }
+
+  #custom-power-profile.performance {
+    color: @orange;
+  }
+
+  #custom-power-profile.powersaver {
+    color: @green;
+  }
+
+  #custom-power-profile.balanced {
+    color: @aqua;
+  }
+
+  #custom-power-profile.custom {
+    color: @amber;
   }
 ''

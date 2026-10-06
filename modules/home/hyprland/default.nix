@@ -10,6 +10,7 @@
     ./hyprtoolkit-demo
     ./hyprtoolkit-overlay
     ./packages.nix
+    ./power-profile
     ./rofi.nix
     ./rofi-demo
     ./rules.nix
