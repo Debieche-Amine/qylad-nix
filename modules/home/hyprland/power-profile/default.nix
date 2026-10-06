@@ -96,6 +96,42 @@
       font-weight: bold;
     }
 
+    .step-btn {
+      background-color: alpha(@base02, 0.7);
+      border: 1px solid alpha(@base03, 0.5);
+      border-radius: 8px;
+      padding: 4px 12px;
+      font-size: 14px;
+      font-weight: bold;
+      color: @base05;
+    }
+
+    .step-btn:hover {
+      background-color: alpha(@base03, 0.9);
+      border-color: @base0D;
+    }
+
+    .tier-btn {
+      background-color: alpha(@base02, 0.5);
+      border: 1px solid alpha(@base03, 0.35);
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 11px;
+      color: @base04;
+    }
+
+    .tier-btn:hover {
+      background-color: alpha(@base02, 0.85);
+      color: @base05;
+    }
+
+    .tier-btn.active {
+      background-color: @base0D;
+      color: @base00;
+      border-color: @base0D;
+      font-weight: bold;
+    }
+
     .reset-btn {
       background-color: alpha(@base02, 0.7);
       border: 1px solid alpha(@base08, 0.4);
@@ -175,15 +211,9 @@
   };
 
   powerProfileGui = pkgs.writeShellScriptBin "power-profile-gui" ''
-    active_class="$(${pkgs.hyprland}/bin/hyprctl activewindow -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.class // empty')"
-    if [ "$active_class" = "power-profile-gui" ]; then
-      ${pkgs.hyprland}/bin/hyprctl dispatch closewindow "class:power-profile-gui"
-      exit 0
-    fi
-
-    existing="$(${pkgs.hyprland}/bin/hyprctl clients -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[] | select(.class == "power-profile-gui") | .address' | head -n 1)"
+    existing="$(${pkgs.hyprland}/bin/hyprctl clients -j 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[] | select(.class == "power-profile-gui" or .initialClass == "power-profile-gui") | .address' | head -n 1)"
     if [ -n "$existing" ]; then
-      ${pkgs.hyprland}/bin/hyprctl dispatch focuswindow "address:$existing"
+      ${pkgs.hyprland}/bin/hyprctl dispatch closewindow "address:$existing"
       exit 0
     fi
 

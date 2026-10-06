@@ -3,17 +3,20 @@ import json
 import os
 import subprocess
 import sys
+import threading
 
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
+GLib.set_prgname("power-profile-gui")
+GLib.set_application_name("power-profile-gui")
+
 CTL_BIN = os.environ.get("POWER_PROFILE_CTL_BIN")
 if not CTL_BIN or not os.path.exists(CTL_BIN):
     candidate = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ctl.py")
     CTL_BIN = candidate if os.path.exists(candidate) else "power-profile-ctl"
-
 
 PROFILES = {
     "performance": {
@@ -41,6 +44,17 @@ PROFILES = {
         "max_perf_pct": 70,
     },
 }
+
+TIERS = [
+    (8, "400M"),
+    (15, "700M"),
+    (20, "940M"),
+    (25, "1.2G"),
+    (30, "1.4G"),
+    (50, "2.4G"),
+    (70, "3.3G"),
+    (100, "Max"),
+]
 
 CSS_TEMPLATE = """
 * {
@@ -122,6 +136,42 @@ window {
     font-weight: bold;
 }
 
+.step-btn {
+    background-color: alpha(#313244, 0.7);
+    border: 1px solid alpha(#45475a, 0.5);
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #cdd6f4;
+}
+
+.step-btn:hover {
+    background-color: alpha(#45475a, 0.9);
+    border-color: #89b4fa;
+}
+
+.tier-btn {
+    background-color: alpha(#313244, 0.5);
+    border: 1px solid alpha(#45475a, 0.35);
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 11px;
+    color: #a6adc8;
+}
+
+.tier-btn:hover {
+    background-color: alpha(#45475a, 0.8);
+    color: #cdd6f4;
+}
+
+.tier-btn.active {
+    background-color: #89b4fa;
+    color: #11111b;
+    border-color: #89b4fa;
+    font-weight: bold;
+}
+
 .reset-btn {
     background-color: alpha(#313244, 0.7);
     border: 1px solid alpha(#f38ba8, 0.4);
@@ -169,11 +219,22 @@ switch:checked {
 """
 
 
+def pct_to_freq_str(pct):
+    if pct <= 8:
+        return "400 MHz (8% min)"
+    mhz = int(round((pct / 100.0) * 4700))
+    if mhz < 1000:
+        return f"{mhz} MHz ({pct}%)"
+    else:
+        ghz = mhz / 1000.0
+        return f"{ghz:.2f} GHz ({pct}%)"
+
+
 def run_ctl(cmd_args):
     try:
         res = subprocess.run([CTL_BIN] + cmd_args, capture_output=True, text=True, check=True)
         return res.stdout.strip()
-    except Exception as e:
+    except Exception:
         return ""
 
 
@@ -202,15 +263,17 @@ class PowerProfileWindow(Gtk.Window):
     def __init__(self):
         super().__init__(title="Power & Performance")
         self.set_wmclass("power-profile-gui", "power-profile-gui")
-        self.set_default_size(520, 600)
+        self.set_default_size(580, 640)
         self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_border_width(16)
 
         self.suppress_events = False
+        self.debounce_timer_id = None
         self.profile_buttons = {}
         self.gov_buttons = {}
         self.epp_buttons = {}
+        self.tier_buttons = {}
 
         self.apply_css()
         self.build_ui()
@@ -219,7 +282,7 @@ class PowerProfileWindow(Gtk.Window):
         # Close on Escape key
         self.connect("key-press-event", self.on_key_press)
 
-        # Poll every 2 seconds for live clock/temp and sync
+        # Poll every 2 seconds for live clock/temp
         GLib.timeout_add_seconds(2, self.on_poll_timer)
 
     def on_key_press(self, widget, event):
@@ -339,24 +402,55 @@ class PowerProfileWindow(Gtk.Window):
         turbo_box.pack_start(self.turbo_switch, False, False, 0)
         card.pack_start(turbo_box, False, False, 0)
 
-        # 3d. Max Perf Pct
-        perf_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        perf_lbl = Gtk.Label(label="󰾅  Max Perf Limit:")
+        # 3d. Max Clock / Performance Limit
+        perf_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+
+        perf_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        perf_lbl = Gtk.Label(label="󰾅  Max Clock Limit:")
         perf_lbl.set_xalign(0.0)
-        perf_lbl.set_size_request(140, -1)
-        perf_box.pack_start(perf_lbl, False, False, 0)
+        perf_header.pack_start(perf_lbl, True, True, 0)
+
+        self.scale_val_lbl = Gtk.Label(label="4.70 GHz (100%)")
+        self.scale_val_lbl.set_xalign(1.0)
+        self.scale_val_lbl.get_style_context().add_class("status-subtitle")
+        perf_header.pack_end(self.scale_val_lbl, False, False, 0)
+        perf_card.pack_start(perf_header, False, False, 0)
+
+        # Stepper and Slider
+        scale_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+
+        btn_minus = Gtk.Button(label="−")
+        btn_minus.get_style_context().add_class("step-btn")
+        btn_minus.connect("clicked", lambda b: self.step_scale(-1))
+        scale_box.pack_start(btn_minus, False, False, 0)
 
         self.scale_adjustment = Gtk.Adjustment(value=100, lower=1, upper=100, step_increment=1, page_increment=5)
         self.scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL, adjustment=self.scale_adjustment)
         self.scale.set_digits(0)
         self.scale.set_draw_value(False)
         self.scale.connect("value-changed", self.on_scale_changed)
-        perf_box.pack_start(self.scale, True, True, 0)
+        scale_box.pack_start(self.scale, True, True, 0)
 
-        self.scale_val_lbl = Gtk.Label(label="100%")
-        self.scale_val_lbl.set_size_request(45, -1)
-        perf_box.pack_start(self.scale_val_lbl, False, False, 0)
-        card.pack_start(perf_box, False, False, 0)
+        btn_plus = Gtk.Button(label="+")
+        btn_plus.get_style_context().add_class("step-btn")
+        btn_plus.connect("clicked", lambda b: self.step_scale(1))
+        scale_box.pack_start(btn_plus, False, False, 0)
+
+        perf_card.pack_start(scale_box, False, False, 0)
+
+        # Quick Frequency Tiers
+        tier_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        tier_box.set_homogeneous(True)
+
+        for pct, label in TIERS:
+            t_btn = Gtk.Button(label=label)
+            t_btn.get_style_context().add_class("tier-btn")
+            t_btn.connect("clicked", self.on_tier_clicked, pct)
+            self.tier_buttons[pct] = t_btn
+            tier_box.pack_start(t_btn, True, True, 0)
+
+        perf_card.pack_start(tier_box, False, False, 0)
+        card.pack_start(perf_card, False, False, 0)
 
         # 4. Action Buttons (Reset & Close)
         actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -411,12 +505,39 @@ class PowerProfileWindow(Gtk.Window):
         # Turbo switch
         self.turbo_switch.set_active(st.get("turbo", True))
 
-        # Max perf scale
+        # Max perf scale & tiers
         max_pct = st.get("max_perf_pct", 100)
         self.scale.set_value(max_pct)
-        self.scale_val_lbl.set_text(f"{max_pct}%")
+        self.scale_val_lbl.set_text(pct_to_freq_str(max_pct))
+
+        for pct, btn in self.tier_buttons.items():
+            if pct == max_pct:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
 
         self.suppress_events = False
+
+    def refresh_status_only(self):
+        st = get_status()
+        glyph = st.get("glyph", "󰾆")
+        disp_name = st.get("display_name", "Balanced")
+        self.status_title.set_text(f"{glyph}  {disp_name}")
+        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C")
+
+        active_prof = st.get("active_profile", "")
+        for key, btn in self.profile_buttons.items():
+            if key == active_prof:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        max_pct = int(self.scale.get_value())
+        for pct, btn in self.tier_buttons.items():
+            if pct == max_pct:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
 
     def on_poll_timer(self):
         st = get_status()
@@ -446,13 +567,44 @@ class PowerProfileWindow(Gtk.Window):
         self.refresh_ui()
         return False
 
+    def step_scale(self, delta):
+        curr = int(self.scale.get_value())
+        new_val = max(1, min(100, curr + delta))
+        self.scale.set_value(new_val)
+
+    def on_tier_clicked(self, widget, pct):
+        self.scale.set_value(pct)
+
     def on_scale_changed(self, scale):
         if self.suppress_events:
             return
         val = int(scale.get_value())
-        self.scale_val_lbl.set_text(f"{val}%")
+        # Instantly update label (silky smooth, zero latency!)
+        self.scale_val_lbl.set_text(pct_to_freq_str(val))
+
+        # Update tier buttons highlight
+        for pct, btn in self.tier_buttons.items():
+            if pct == val:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        # Cancel previous timer
+        if self.debounce_timer_id is not None:
+            GLib.source_remove(self.debounce_timer_id)
+            self.debounce_timer_id = None
+
+        # Debounce writing to hardware by 250ms so slider moves completely freely
+        self.debounce_timer_id = GLib.timeout_add(250, self.apply_scale_debounced, val)
+
+    def apply_scale_debounced(self, val):
+        self.debounce_timer_id = None
+        threading.Thread(target=self._async_set_scale, args=(val,), daemon=True).start()
+        return False
+
+    def _async_set_scale(self, val):
         run_ctl(["set-param", "--max-perf-pct", str(val)])
-        self.refresh_ui()
+        GLib.idle_add(self.refresh_status_only)
 
     def on_reset_clicked(self, widget):
         run_ctl(["reset"])
