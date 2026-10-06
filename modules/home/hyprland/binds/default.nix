@@ -49,7 +49,6 @@ in {
           "${modifier} SHIFT, G, exec, ${scripts.restrictedMode}/bin/hypr-restricted-mode enter"
           "${modifier}, D, exec, ${menu}"
           "${modifier}, C, exec, hypr-control-panel"
-          "${modifier}, X, exec, power-profile-gui"
           "${modifier}, Q, killactive"
 
           "${modifier}, H, movefocus, l"
@@ -117,7 +116,7 @@ in {
           "${modifier} SHIFT, 3, movetoworkspacesilent, special:s3"
           "${modifier}, 3, togglespecialworkspace, s3"
 
-          "${modifier} SHIFT, C, exec, ${pkgs.hyprland}/bin/hyprctl reload"
+          "${modifier} SHIFT, C, exec, power-profile-gui"
           "${modifier} SHIFT, R, exec, ${pkgs.hyprland}/bin/hyprctl reload"
           "${modifier} SHIFT, X, exec, ${uwsm} app -- ${logoutMenu}"
 
