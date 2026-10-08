@@ -18,5 +18,6 @@
     zip
     unzip
     rar
+    wifite2
   ];
 }
