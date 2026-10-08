@@ -140,7 +140,7 @@
             # treesitter.package = pkgs.vimPlugins.nvim-treesitter.grammarPlugins.nix;
           };
           rust = {
-            enable = false;
+            enable = true;
             extensions.crates-nvim.enable = true;
             #   lsp.opts = ''
             #     ["rust-analyzer"] = {
