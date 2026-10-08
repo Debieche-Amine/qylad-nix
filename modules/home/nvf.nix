@@ -20,7 +20,20 @@
           foldenable = true;
 
           cursorline = true;
+          tabstop = 4;
+          shiftwidth = 4;
+          softtabstop = 4;
+          expandtab = true;
         };
+
+        autocmds = [
+          {
+            event = ["FileType"];
+            pattern = ["c" "cpp"];
+            desc = "Set 2-space indentation for C and C++";
+            command = "setlocal tabstop=2 shiftwidth=2 softtabstop=2 expandtab";
+          }
+        ];
         theme = {
           enable = true;
           style = "warm"; #"dark", "darker", "cool", "deep", "warm", "warmer"
