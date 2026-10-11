@@ -6,6 +6,8 @@
     openssl
     cargo
     rustc
-    rustup
+    clippy
+    rustfmt
+    rust-analyzer
   ];
 }
