@@ -51,7 +51,9 @@
     nativeBuildInputs = [pkgs.makeWrapper];
     postBuild = ''
       wrapProgram $out/bin/agy \
-        --set DBUS_SESSION_BUS_ADDRESS "unix:path=/tmp/nonexistent-dbus-socket"
+        --set DBUS_SESSION_BUS_ADDRESS "unix:path=/tmp/nonexistent-dbus-socket" \
+        --set DO_NOT_TRACK "1" \
+        --set GEMINI_TELEMETRY_ENABLED "false"
     '';
   };
 
@@ -61,6 +63,7 @@
     vimInsertFirst = true;
     model = "Gemini 3.8 Flash (High)";
     showFeedbackSurvey = false;
+    enableTelemetry = false;
     statusLine = {
       type = "";
       command = "";
@@ -169,6 +172,8 @@
         export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
         export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
         export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+        export DO_NOT_TRACK="1"
+        export GEMINI_TELEMETRY_ENABLED="false"
         export GOPATH="$REAL_HOME/go"
         export CARGO_HOME="$REAL_HOME/.cargo"
         export RUSTUP_HOME="$REAL_HOME/.rustup"
@@ -560,6 +565,9 @@ in {
       general = {
         vimMode = true;
         preferredEditor = "neovim";
+      };
+      telemetry = {
+        enabled = false;
       };
     };
     force = true;
