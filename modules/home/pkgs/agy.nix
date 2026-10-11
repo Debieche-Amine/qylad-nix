@@ -180,7 +180,7 @@
     pkgs.writeShellScriptBin "agy${toString id}" ''
       exec ${agyn}/bin/agyn ${toString id} "$@"
     '';
-  agyWrappers = map mkAgyWrapper [1 2 3 4 5 6 7 8 9 10];
+  agyWrappers = map mkAgyWrapper (pkgs.lib.range 1 40);
 
   # agy-usage: Parallel account usage checker querying ~/.gemini/accounts
   agy-usage = pkgs.writeShellScriptBin "agy-usage" ''
