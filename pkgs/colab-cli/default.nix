@@ -3,6 +3,20 @@
   fetchurl,
   python3Packages,
 }: let
+  filelock = python3Packages.buildPythonPackage rec {
+    pname = "filelock";
+    version = "3.29.2";
+    format = "wheel";
+
+    src = fetchurl {
+      url = "https://files.pythonhosted.org/packages/45/c1/91b0faf8de6938ae72da425e0c6f322d270c044e5ffc372e6f0f89ed1564/filelock-3.29.2-py3-none-any.whl";
+      hash = "sha256-9dP+tEsriCSDJYdUOvUiaCL+hrrwhmeO3keqF3/kfKU=";
+    };
+
+    doCheck = false;
+    dontCheckRuntimeDeps = true;
+  };
+
   jupyter-mimetypes = python3Packages.buildPythonPackage rec {
     pname = "jupyter-mimetypes";
     version = "0.2.0";
@@ -32,15 +46,19 @@
       hash = "sha256-d6y48vc42XYl1r0B7ozyHE1ZeQt7pGQQhxLbOHBBbyA=";
     };
 
-    dependencies = with python3Packages; [
-      jupyter-client
-      jupyter-core
-      jupyter-mimetypes
-      requests
-      traitlets
-      typing-extensions
-      websocket-client
-    ];
+    dependencies =
+      [
+        filelock
+        jupyter-mimetypes
+      ]
+      ++ (with python3Packages; [
+        jupyter-client
+        jupyter-core
+        requests
+        traitlets
+        typing-extensions
+        websocket-client
+      ]);
 
     doCheck = false;
     dontCheckRuntimeDeps = true;
@@ -56,24 +74,27 @@ in
       hash = "sha256-FDXzUzpwZPJ7i4ElLahTcEJ9bPk7lObDRze9HMaOwpI=";
     };
 
-    dependencies = with python3Packages; [
-      click
-      filelock
-      google-auth
-      google-auth-oauthlib
-      html2text
-      jupyter-kernel-client
-      nbformat
-      packaging
-      prompt-toolkit
-      pydantic
-      pygments
-      requests
-      rich
-      typer
-      typing-extensions
-      websocket-client
-    ];
+    dependencies =
+      [
+        filelock
+        jupyter-kernel-client
+      ]
+      ++ (with python3Packages; [
+        click
+        google-auth
+        google-auth-oauthlib
+        html2text
+        nbformat
+        packaging
+        prompt-toolkit
+        pydantic
+        pygments
+        requests
+        rich
+        typer
+        typing-extensions
+        websocket-client
+      ]);
 
     doCheck = false;
     dontCheckRuntimeDeps = true;
