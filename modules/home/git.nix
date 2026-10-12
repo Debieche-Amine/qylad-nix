@@ -27,7 +27,7 @@
       "github.com" = {
         hostname = "github.com";
         user = "git";
-        identityFile = "${config.home.homeDirectory}/.ssh/qyladx";
+        identityFile = "${config.home.homeDirectory}/.ssh/qylad-msi.pub";
         identitiesOnly = true;
       };
     };
