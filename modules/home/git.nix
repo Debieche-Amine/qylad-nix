@@ -11,7 +11,7 @@
       user.email = "qylad@porton.me";
       signing = {
         format = "ssh";
-        key = "${config.home.homeDirectory}/.ssh/qyladx.pub";
+        key = "${config.home.homeDirectory}/.ssh/qylad-msi.pub";
         signByDefault = true;
       };
 
