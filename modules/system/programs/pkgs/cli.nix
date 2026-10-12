@@ -19,5 +19,6 @@
     unzip
     rar
     wifite2
+    (callPackage ../../../../pkgs/colab-cli {})
   ];
 }
