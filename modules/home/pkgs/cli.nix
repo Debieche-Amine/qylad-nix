@@ -70,5 +70,7 @@ in {
     pkgs.unstable.pi-coding-agent
     pi2
     pi3
+
+    pkgs.micro
   ];
 }
