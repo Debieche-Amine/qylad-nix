@@ -21,7 +21,7 @@
       "match:class ^(Pavucontrol|pavucontrol)$, float on, size 850 560, center on"
       "match:float true, border_color rgb(${config.lib.stylix.colors.base0B})"
       "match:title ^Picture-in-Picture$, float on, pin on"
-      "match:class ^(nm-connection-editor|blueman-manager)$, float on, center on"
+      "match:class ^(nm-connection-editor|[Bb]lueman-(manager|services|sendto))$, float on, center on"
       "match:title ^(Open File|Save File|Select a File|File Upload)$, float on, center on"
       "match:class ^(excalidraw)$, workspace special:s1, fullscreen on"
       "match:class ^(hypr-control-panel)$, float on, size 1360 780, center on"

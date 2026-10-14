@@ -33,6 +33,7 @@ in {
   modules-right = [
     "custom/netusage"
     "network"
+    "bluetooth"
     "pulseaudio"
     "backlight"
     "battery"
@@ -180,6 +181,21 @@ in {
     format-disconnected = "󰖪";
     tooltip-format = "{ifname}\n{essid}\n{ipaddr}";
     on-click = "${uwsm} app -- ${pkgs.networkmanagerapplet}/bin/nm-connection-editor";
+  };
+
+  bluetooth = {
+    interval = 3;
+    format = " {status}";
+    format-connected = " {device_alias}";
+    format-connected-battery = " {device_alias} {device_battery_percentage}%";
+    format-disabled = "󰂲 off";
+    format-off = "󰂲 off";
+    tooltip-format = "{controller_alias}\t{controller_address}\n\n{num_connections} connected";
+    tooltip-format-connected = "{controller_alias}\t{controller_address}\n\n{num_connections} connected\n\n{device_enumerate}";
+    tooltip-format-enumerate-connected = "{device_alias}\t{device_address}";
+    tooltip-format-enumerate-connected-battery = "{device_alias}\t{device_address}\t({device_battery_percentage}%)";
+    on-click = "${uwsm} app -- ${pkgs.blueman}/bin/blueman-manager";
+    on-click-right = "${pkgs.util-linux}/bin/rfkill toggle bluetooth";
   };
 
   backlight = {

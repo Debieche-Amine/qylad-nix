@@ -49,6 +49,7 @@
   #temperature,
   #custom-netusage,
   #network,
+  #bluetooth,
   #backlight,
   #pulseaudio,
   #custom-mic,
@@ -172,8 +173,14 @@
   }
 
   #network.disconnected,
-  #pulseaudio.muted {
+  #pulseaudio.muted,
+  #bluetooth.disabled,
+  #bluetooth.off {
     color: @muted;
+  }
+
+  #bluetooth.connected {
+    color: @aqua;
   }
 
   #custom-power-profile.performance {

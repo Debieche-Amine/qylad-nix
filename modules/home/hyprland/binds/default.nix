@@ -27,6 +27,7 @@ in {
     hyprpicker
     pavucontrol
     networkmanagerapplet
+    blueman
     wl-screenrec
     swayosd
     scripts.restrictedMode

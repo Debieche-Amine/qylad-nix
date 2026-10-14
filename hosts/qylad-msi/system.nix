@@ -47,6 +47,7 @@ in {
     # ../../modules/system/services/yss-vm.nix
     # ../../modules/system/services/baratis-vm.nix
     ../../modules/system/services/mtp.nix
+    ../../modules/system/services/bluetooth.nix
 
     ../../modules/system/programs/android
     ../../modules/system/programs/esp.nix
