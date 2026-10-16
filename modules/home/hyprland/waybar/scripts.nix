@@ -5,7 +5,7 @@
     print_lane() {
       current="$(${pkgs.hyprland}/bin/hyprctl -j activeworkspace | ${pkgs.jq}/bin/jq -r '.name // ""')"
 
-      if printf '%s\n' "$current" | ${pkgs.gnugrep}/bin/grep -Eq '^(a|z|e|i|o|p):-?[0-9]+$'; then
+      if printf '%s\n' "$current" | ${pkgs.gnugrep}/bin/grep -Eiq '^([a-z0-9]+):-?[0-9]+$'; then
         lane="''${current%%:*}"
         ${pkgs.jq}/bin/jq -cn \
           --arg text "$current" \
