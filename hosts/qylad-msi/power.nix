@@ -1,7 +1,22 @@
-{pkgs, ...}: let
+{
+  pkgs,
+  lib,
+  ...
+}: let
   powerProfileBackend = pkgs.writeShellScriptBin "power-profile-backend" (builtins.readFile ../../modules/home/hyprland/power-profile/backend.sh);
 in {
-  environment.systemPackages = [powerProfileBackend];
+  environment.systemPackages = [
+    powerProfileBackend
+    (pkgs.writeShellScriptBin "nvidia-offload" ''
+      export __NV_PRIME_RENDER_OFFLOAD=1
+      export __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0
+      export __GLX_VENDOR_LIBRARY_NAME=nvidia
+      export __VK_LAYER_NV_optimus=NVIDIA_only
+      export __EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json
+      export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+      exec "$@"
+    '')
+  ];
 
   security.sudo.extraRules = [
     {
@@ -23,11 +38,39 @@ in {
   powerManagement.cpuFreqGovernor = "performance";
 
   # Enable fine-grained PCIe runtime power management (RTD3/D3cold) for Turing dGPU (GTX 1650)
-  # Drops idle power consumption from ~3W to 0W when not running offloaded tasks
-  hardware.nvidia.powerManagement = {
-    enable = true;
-    finegrained = true;
+  # Drops idle power consumption from ~3W (D3hot/active) to 0W (D3cold) when not running offloaded tasks
+  hardware.nvidia = {
+    # Turing GPUs (GTX 1650 / TU117) require proprietary kernel modules for RTD3 / D3cold;
+    # the open kernel modules report "Runtime D3 status: Not supported" on Turing.
+    open = lib.mkForce false;
+
+    powerManagement = {
+      enable = true;
+      finegrained = true;
+    };
+
+    prime.offload = {
+      # Use our custom wrapper above which also specifies EGL and Vulkan ICD variables
+      enableOffloadCmd = lib.mkForce false;
+    };
   };
+
+  boot.extraModprobeConfig = ''
+    options nvidia NVreg_TemporaryFilePath=/var/tmp
+  '';
+
+  # PCIe runtime PM rules:
+  # 1. Nixpkgs' default rule only triggers on ACTION=="bind", which misses boot/coldplug ACTION=="add".
+  # 2. Both the discrete GPU and its parent PCIe Root Port (0000:00:1c.4) must have power/control
+  #    set to "auto" for the link to transition into D3cold (0W).
+  services.udev.extraRules = ''
+    # Enable runtime PM for PCIe Root Port and PCI bridges
+    ACTION=="add|bind", SUBSYSTEM=="pci", ATTR{class}=="0x060400", TEST=="power/control", ATTR{power/control}="auto"
+    ACTION=="add|bind", SUBSYSTEM=="pci", KERNEL=="0000:00:1c.4", TEST=="power/control", ATTR{power/control}="auto"
+
+    # Enable runtime PM for NVIDIA GPU
+    ACTION=="add|bind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x03[0-9]*", TEST=="power/control", ATTR{power/control}="auto"
+  '';
 
   # Thermal management daemon to proactively handle thermal zones
   services.thermald.enable = true;

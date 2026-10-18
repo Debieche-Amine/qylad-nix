@@ -42,6 +42,8 @@ in
         krb5
         fontconfig
         freetype
+        dejavu_fonts
+        noto-fonts
         libxkbcommon
         libX11
         libXext
@@ -58,8 +60,7 @@ in
       ];
 
     runScript = writeShellScript "filee-dispatcher" ''
-      bin_name="$(${coreutils}/bin/basename "$0")"
-      if [ "$bin_name" = "filee" ] || [ "$bin_name" = "filee-cli" ]; then
+      if [ "$FILEE_BIN" = "filee-cli" ]; then
         exec "${unwrapped}/opt/filee/filee-cli" "$@"
       else
         exec "${unwrapped}/opt/filee/Filee" "$@"
@@ -67,9 +68,23 @@ in
     '';
 
     extraInstallCommands = ''
-      mkdir -p $out/bin
-      ln -s $out/bin/filee $out/bin/Filee
-      ln -s $out/bin/filee $out/bin/filee-cli
+            mv $out/bin/filee $out/bin/.filee-fhs-wrapper
+
+            cat << 'EOF' > $out/bin/Filee
+      #!/bin/sh
+      export FILEE_BIN=Filee
+      exec "$(dirname "$0")/.filee-fhs-wrapper" "$@"
+      EOF
+            chmod +x $out/bin/Filee
+
+            cat << 'EOF' > $out/bin/filee-cli
+      #!/bin/sh
+      export FILEE_BIN=filee-cli
+      exec "$(dirname "$0")/.filee-fhs-wrapper" "$@"
+      EOF
+            chmod +x $out/bin/filee-cli
+
+            ln -s $out/bin/filee-cli $out/bin/filee
     '';
 
     meta = with lib; {

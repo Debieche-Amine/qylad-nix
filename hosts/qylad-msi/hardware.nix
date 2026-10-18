@@ -35,6 +35,8 @@
     {device = "/dev/mapper/luks-a73fd3be-fa25-4ea5-9fd8-bf77bd0356b2";}
   ];
 
+  boot.resumeDevice = "/dev/mapper/luks-a73fd3be-fa25-4ea5-9fd8-bf77bd0356b2";
+
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }
