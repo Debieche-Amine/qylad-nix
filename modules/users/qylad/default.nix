@@ -27,7 +27,6 @@
     ../../home/secrets.nix
     ../../home/qutebrowser.nix
     ../../home/rclone.nix
-    ../../home/filee.nix
   ];
 
   # This value determines the Home Manager release that your configuration is

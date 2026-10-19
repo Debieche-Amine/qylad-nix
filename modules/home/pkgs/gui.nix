@@ -33,5 +33,6 @@
     pkgs.kdePackages.krdc
     pkgs.gnome-connections
     pkgs.virt-viewer
+    (pkgs.callPackage ../../../pkgs/filee {})
   ];
 }

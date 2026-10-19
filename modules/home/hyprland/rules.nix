@@ -26,6 +26,7 @@
       "match:class ^(excalidraw)$, workspace special:s1, fullscreen on"
       "match:class ^(hypr-control-panel)$, float on, size 1360 780, center on"
       "match:class ^(power-profile-gui)$, float on, size 620 740, center on"
+      "match:class ^([Ff]ilee)$, float on, center on"
     ];
 
     layerrule = [

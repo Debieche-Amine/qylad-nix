@@ -4,10 +4,19 @@
   fetchurl,
   buildFHSEnv,
   writeShellScript,
-  coreutils,
+  makeDesktopItem,
 }: let
   pname = "filee";
   version = "1.10.4";
+
+  desktopItem = makeDesktopItem {
+    name = "filee";
+    desktopName = "Filee";
+    exec = "Filee";
+    icon = "filee";
+    comment = "Offline file format converter";
+    categories = ["Utility"];
+  };
 
   unwrapped = stdenv.mkDerivation {
     pname = "${pname}-unwrapped";
@@ -85,6 +94,10 @@ in
             chmod +x $out/bin/filee-cli
 
             ln -s $out/bin/filee-cli $out/bin/filee
+
+      mkdir -p $out/share/applications $out/share/pixmaps
+      cp ${unwrapped}/opt/filee/filee.png $out/share/pixmaps/filee.png
+      cp -r ${desktopItem}/share/applications/* $out/share/applications/
     '';
 
     meta = with lib; {
