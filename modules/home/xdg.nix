@@ -19,12 +19,12 @@
 
     defaultApplications = {
       # Web
-      "text/html" = ["vivaldi-stable.desktop"];
-      "application/xhtml+xml" = ["vivaldi-stable.desktop"];
-      "x-scheme-handler/http" = ["vivaldi-stable.desktop"];
-      "x-scheme-handler/https" = ["vivaldi-stable.desktop"];
-      "x-scheme-handler/about" = ["vivaldi-stable.desktop"];
-      "x-scheme-handler/unknown" = ["vivaldi-stable.desktop"];
+      "text/html" = ["zen-beta.desktop"];
+      "application/xhtml+xml" = ["zen-beta.desktop"];
+      "x-scheme-handler/http" = ["zen-beta.desktop"];
+      "x-scheme-handler/https" = ["zen-beta.desktop"];
+      "x-scheme-handler/about" = ["zen-beta.desktop"];
+      "x-scheme-handler/unknown" = ["zen-beta.desktop"];
 
       # PDF & PostScript
       "application/pdf" = ["org.pwmt.zathura.desktop"];

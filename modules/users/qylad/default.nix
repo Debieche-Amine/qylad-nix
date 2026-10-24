@@ -20,6 +20,7 @@
     ../../home/hyprland
     ../../home/pkgs
     ../../home/xdg.nix
+    ../../home/zen.nix
     ../../home/gnome-text-editor.nix
     ../../home/zoxide.nix
     ../../home/eza.nix
