@@ -196,8 +196,11 @@
     import re
     import tempfile
     import subprocess
+    import threading
+    import shutil
+    import base64
     from datetime import datetime, timezone
-    from concurrent.futures import ThreadPoolExecutor
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
     args = sys.argv[1:]
     if "-h" in args or "--help" in args:
@@ -329,102 +332,125 @@
             except Exception:
                 pass
 
+        if not email:
+            try:
+                with open(tok_file) as f:
+                    tok_data = json.load(f)
+                id_tok = tok_data.get("id_token", "")
+                if id_tok and "." in id_tok:
+                    payload = id_tok.split(".")[1]
+                    payload += "=" * (-len(payload) % 4)
+                    claims = json.loads(base64.urlsafe_b64decode(payload))
+                    email = claims.get("email")
+                    if email:
+                        with open(email_file, "w") as ef:
+                            ef.write(email)
+            except Exception:
+                pass
+
         with tempfile.TemporaryDirectory(prefix=f"agy-usage-{acc_id}-") as tmpdir:
             tmp_cli = os.path.join(tmpdir, ".gemini", "antigravity-cli")
-            os.makedirs(tmp_cli, exist_ok=True)
-            os.symlink(tok_file, os.path.join(tmp_cli, "antigravity-oauth-token"))
+            os.makedirs(os.path.join(tmp_cli, "cache"), exist_ok=True)
+            tmp_token = os.path.join(tmp_cli, "antigravity-oauth-token")
+            shutil.copyfile(tok_file, tmp_token)
+            os.chmod(tmp_token, 0o600)
+
+            real_home = os.path.expanduser("~")
+            for fn in ["settings.json", "jetski_state.pbtxt"]:
+                src = os.path.join(real_home, ".gemini/antigravity-cli", fn)
+                if os.path.exists(src):
+                    os.symlink(src, os.path.join(tmp_cli, fn))
+            ob = os.path.join(real_home, ".gemini/antigravity-cli/cache/onboarding.json")
+            if os.path.exists(ob):
+                os.symlink(ob, os.path.join(tmp_cli, "cache/onboarding.json"))
+
             env = dict(
                 os.environ,
                 HOME=tmpdir,
                 DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
+                DO_NOT_TRACK="1",
+                GEMINI_TELEMETRY_ENABLED="false",
             )
+
+            res = None
+            timed_out = False
             try:
                 res = subprocess.run(
                     ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
                     stdin=subprocess.DEVNULL,
-                    capture_output=True, text=True, timeout=25, env=env
+                    capture_output=True, text=True, timeout=12, env=env
                 )
-                if "Authentication required" in res.stdout or "Authentication required" in res.stderr:
-                    return {"name": acc_id, "connected": False, "reason": "Auth expired", "email": email}
-                if res.returncode != 0:
-                    return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
-
-                data = json.loads(res.stdout)
-                if data.get("status") != "SUCCESS":
-                    return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
-
-                groups = data.get("command", {}).get("data", {}).get("groups", [])
-                gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
-                if not gemini:
-                    return {"name": acc_id, "connected": False, "reason": "No Gemini data", "email": email}
-
-                buckets = gemini.get("buckets", [])
-                w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
-                h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
-
-                return {
-                    "name": acc_id,
-                    "is_current": (acc_id == current_id),
-                    "connected": True,
-                    "email": email,
-                    "weekly": {
-                        "fraction": w_b.get("remaining_fraction"),
-                        "disabled": w_b.get("disabled", False),
-                        "reset_time": w_b.get("reset_time"),
-                        "desc": w_b.get("description", "")
-                    },
-                    "five_hour": {
-                        "fraction": h_b.get("remaining_fraction"),
-                        "disabled": h_b.get("disabled", False),
-                        "reset_time": h_b.get("reset_time"),
-                        "desc": h_b.get("description", "")
-                    }
-                }
+            except subprocess.TimeoutExpired:
+                timed_out = True
             except Exception:
-                return {"name": acc_id, "connected": False, "reason": "Timeout/Error", "email": email}
+                pass
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        results = list(ex.map(check_account, account_ids))
+            # If token was refreshed during the run, persist it back to account dir
+            if os.path.exists(tmp_token):
+                try:
+                    with open(tmp_token, "rb") as f_new, open(tok_file, "rb") as f_old:
+                        new_content = f_new.read()
+                        if new_content != f_old.read():
+                            with open(tok_file, "wb") as f_old_w:
+                                f_old_w.write(new_content)
+                            os.chmod(tok_file, 0o600)
+                except Exception:
+                    pass
 
-    if json_mode:
-        out = []
-        for r in results:
-            item = {
-                "account": r["name"],
-                "is_current": r.get("is_current", False),
-                "connected": r["connected"]
+            if timed_out:
+                return {"name": acc_id, "connected": False, "reason": "Timed out", "email": email}
+
+            if not res:
+                return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
+
+            comb_out = (res.stdout or "") + "\n" + (res.stderr or "")
+            low_out = comb_out.lower()
+
+            if "eligibility check failed" in low_out or "verify your account" in low_out:
+                return {"name": acc_id, "connected": False, "reason": "Verify in browser", "email": email}
+            if "authentication required" in low_out or "invalid_grant" in low_out or "revoked" in low_out:
+                return {"name": acc_id, "connected": False, "reason": "Auth expired", "email": email}
+            if "rate limit" in low_out or "resource has been exhausted" in low_out or "429" in comb_out:
+                return {"name": acc_id, "connected": False, "reason": "Rate limited", "email": email}
+
+            if res.returncode != 0:
+                return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
+
+            try:
+                data = json.loads(res.stdout)
+            except Exception:
+                return {"name": acc_id, "connected": False, "reason": "Bad JSON", "email": email}
+
+            if data.get("status") != "SUCCESS":
+                return {"name": acc_id, "connected": False, "reason": "Not connected", "email": email}
+
+            groups = data.get("command", {}).get("data", {}).get("groups", [])
+            gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
+            if not gemini:
+                return {"name": acc_id, "connected": False, "reason": "No Gemini data", "email": email}
+
+            buckets = gemini.get("buckets", [])
+            w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
+            h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
+
+            return {
+                "name": acc_id,
+                "is_current": (acc_id == current_id),
+                "connected": True,
+                "email": email,
+                "weekly": {
+                    "fraction": w_b.get("remaining_fraction"),
+                    "disabled": w_b.get("disabled", False),
+                    "reset_time": w_b.get("reset_time"),
+                    "desc": w_b.get("description", "")
+                },
+                "five_hour": {
+                    "fraction": h_b.get("remaining_fraction"),
+                    "disabled": h_b.get("disabled", False),
+                    "reset_time": h_b.get("reset_time"),
+                    "desc": h_b.get("description", "")
+                }
             }
-            if r["connected"]:
-                item["email"] = r.get("email")
-                w = r["weekly"]
-                h = r["five_hour"]
-                w_time, _ = format_time_left(w.get("reset_time"), w.get("desc"), w.get("fraction"))
-                raw_w_time = re.sub(r"\033\[[0-9;]*m", "", w_time).strip()
-                item["gemini_weekly"] = {
-                    "remaining_fraction": w.get("fraction"),
-                    "remaining_percentage": int(round(w["fraction"] * 100)) if w.get("fraction") is not None else None,
-                    "reset_time": w.get("reset_time"),
-                    "time_left": raw_w_time,
-                    "disabled": w.get("disabled", False)
-                }
-                if h.get("disabled"):
-                    raw_h_time = "paused"
-                else:
-                    h_time, _ = format_time_left(h.get("reset_time"), h.get("desc"), h.get("fraction"))
-                    raw_h_time = re.sub(r"\033\[[0-9;]*m", "", h_time).strip()
-                item["gemini_5h"] = {
-                    "remaining_fraction": h.get("fraction"),
-                    "remaining_percentage": None if h.get("disabled") else (int(round(h["fraction"] * 100)) if h.get("fraction") is not None else None),
-                    "reset_time": h.get("reset_time"),
-                    "time_left": raw_h_time,
-                    "disabled": h.get("disabled", False)
-                }
-            else:
-                item["email"] = r.get("email")
-                item["reason"] = r.get("reason", "Not connected")
-            out.append(item)
-        print(json.dumps(out, indent=2))
-        sys.exit(0)
 
     W_ACC = 7
     W_DATA = 26
@@ -441,30 +467,20 @@
     g5_hdr = "Gemini 5-Hour"
     sp = " "
 
-    print(b(f"╭─{dash_acc}─┬─{dash_data}─┬─{dash_data}─╮"))
-    print(b("│ ") + c(f"{acc_hdr:<{W_ACC}}", "bold") + b(" │ ") +
-          c(f"{gw_hdr:<{W_DATA}}", "bold") + b(" │ ") +
-          c(f"{g5_hdr:<{W_DATA}}", "bold") + b(" │"))
-    print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
-
-    prev_connected = True
-    for i, r in enumerate(results):
+    def format_row(r):
         name = r["name"]
         is_cur = r.get("is_current", False)
         display_name = f"*{name}" if is_cur else name
         name_fmt = c(f"{display_name:<{W_ACC}}", "bright_cyan" if r["connected"] else "dim")
-
-        if show_email and i > 0 and (r["connected"] or prev_connected):
-            print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
-        prev_connected = r["connected"]
 
         if not r["connected"]:
             msg = r["reason"]
             msg_len = len(msg)
             pad_l = (W_BOTH - msg_len) // 2
             pad_r = W_BOTH - msg_len - pad_l
-            center_str = (" " * pad_l) + c(msg, "dim") + (" " * pad_r)
-            print(b("│ ") + name_fmt + b(" │ ") + center_str + b(" │"))
+            color_reason = "bright_yellow" if "verify" in msg.lower() else ("bright_red" if "expired" in msg.lower() else "dim")
+            center_str = (" " * pad_l) + c(msg, color_reason) + (" " * pad_r)
+            return b("│ ") + name_fmt + b(" │ ") + center_str + b(" │")
         else:
             w = r["weekly"]
             w_frac = w.get("fraction")
@@ -498,16 +514,137 @@
                 time_pad = 7 - h_t_len
                 h_col = f" {pct_str}  {h_bar}  {h_time}" + (" " * max(0, time_pad))
 
-            print(b("│ ") + name_fmt + b(" │ ") + w_col + b(" │ ") + h_col + b(" │"))
+            return b("│ ") + name_fmt + b(" │ ") + w_col + b(" │ ") + h_col + b(" │")
 
+    def format_email_row(email):
+        em = email or "(no email found)"
+        sub = f"↳ {em}"
+        sub_pad = W_BOTH - len(sub)
+        sub_str = c(sub, "dim") + (" " * max(0, sub_pad))
+        return b("│ ") + f"{sp:<{W_ACC}}" + b(" │ ") + sub_str + b(" │")
+
+    if json_mode:
+        with ThreadPoolExecutor(max_workers=min(len(account_ids), 20)) as ex:
+            results = list(ex.map(check_account, account_ids))
+        out = []
+        for r in results:
+            item = {
+                "account": r["name"],
+                "is_current": r.get("is_current", False),
+                "connected": r["connected"]
+            }
+            if r["connected"]:
+                item["email"] = r.get("email")
+                w = r["weekly"]
+                h = r["five_hour"]
+                w_time, _ = format_time_left(w.get("reset_time"), w.get("desc"), w.get("fraction"))
+                raw_w_time = re.sub(r"\033\[[0-9;]*m", "", w_time).strip()
+                item["gemini_weekly"] = {
+                    "remaining_fraction": w.get("fraction"),
+                    "remaining_percentage": int(round(w["fraction"] * 100)) if w.get("fraction") is not None else None,
+                    "reset_time": w.get("reset_time"),
+                    "time_left": raw_w_time,
+                    "disabled": w.get("disabled", False)
+                }
+                if h.get("disabled"):
+                    raw_h_time = "paused"
+                else:
+                    h_time, _ = format_time_left(h.get("reset_time"), h.get("desc"), h_frac)
+                    raw_h_time = re.sub(r"\033\[[0-9;]*m", "", h_time).strip()
+                item["gemini_5h"] = {
+                    "remaining_fraction": h.get("fraction"),
+                    "remaining_percentage": None if h.get("disabled") else (int(round(h["fraction"] * 100)) if h.get("fraction") is not None else None),
+                    "reset_time": h.get("reset_time"),
+                    "time_left": raw_h_time,
+                    "disabled": h.get("disabled", False)
+                }
+            else:
+                item["email"] = r.get("email")
+                item["reason"] = r.get("reason", "Not connected")
+            out.append(item)
+        print(json.dumps(out, indent=2))
+        sys.exit(0)
+
+    row_map = {}
+    email_map = {}
+    layout = []
+
+    layout.append(b(f"╭─{dash_acc}─┬─{dash_data}─┬─{dash_data}─╮"))
+    layout.append(b("│ ") + c(f"{acc_hdr:<{W_ACC}}", "bold") + b(" │ ") +
+                  c(f"{gw_hdr:<{W_DATA}}", "bold") + b(" │ ") +
+                  c(f"{g5_hdr:<{W_DATA}}", "bold") + b(" │"))
+    layout.append(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
+
+    for i, acc_id in enumerate(account_ids):
+        if show_email and i > 0:
+            layout.append(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
+        row_map[acc_id] = len(layout)
+        is_cur = (acc_id == current_id)
+        d_name = f"*{acc_id}" if is_cur else acc_id
+        n_fmt = c(f"{d_name:<{W_ACC}}", "dim")
+        loading_msg = c("loading...", "dim")
+        pad_l = (W_BOTH - 10) // 2
+        pad_r = W_BOTH - 10 - pad_l
+        holder = (" " * pad_l) + loading_msg + (" " * pad_r)
+        layout.append(b("│ ") + n_fmt + b(" │ ") + holder + b(" │"))
+        if show_email:
+            email_map[acc_id] = len(layout)
+            layout.append(format_email_row(None))
+
+    layout.append(b(f"╰─{dash_acc}─┴─{dash_data}─┴─{dash_data}─╯"))
+    total_lines = len(layout)
+
+    if is_tty:
+        for line in layout:
+            sys.stdout.write(line + "\n")
+        sys.stdout.flush()
+
+    print_lock = threading.Lock()
+    results_dict = {}
+
+    def update_slot(acc_id, r):
+        results_dict[acc_id] = r
+        if not is_tty:
+            return
+        with print_lock:
+            row_idx = row_map[acc_id]
+            lines_up = total_lines - row_idx
+            row_str = format_row(r)
+            sys.stdout.write(f"\033[{lines_up}A\r{row_str}\033[{lines_up}B\r")
+            if show_email and acc_id in email_map and r.get("email"):
+                em_idx = email_map[acc_id]
+                em_up = total_lines - em_idx
+                em_str = format_email_row(r.get("email"))
+                sys.stdout.write(f"\033[{em_up}A\r{em_str}\033[{em_up}B\r")
+            sys.stdout.flush()
+
+    num_workers = min(len(account_ids), 20)
+    with ThreadPoolExecutor(max_workers=num_workers) as ex:
+        future_to_acc = {ex.submit(check_account, aid): aid for aid in account_ids}
+        for fut in as_completed(future_to_acc):
+            aid = future_to_acc[fut]
+            try:
+                res = fut.result()
+            except Exception:
+                res = {"name": aid, "connected": False, "reason": "Error", "email": None}
+            update_slot(aid, res)
+
+    if not is_tty:
+        print(b(f"╭─{dash_acc}─┬─{dash_data}─┬─{dash_data}─╮"))
+        print(b("│ ") + c(f"{acc_hdr:<{W_ACC}}", "bold") + b(" │ ") +
+              c(f"{gw_hdr:<{W_DATA}}", "bold") + b(" │ ") +
+              c(f"{g5_hdr:<{W_DATA}}", "bold") + b(" │"))
+        print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
+        prev_c = True
+        for i, aid in enumerate(account_ids):
+            r = results_dict.get(aid, {"name": aid, "connected": False, "reason": "Error"})
+            if show_email and i > 0 and (r["connected"] or prev_c):
+                print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
+            prev_c = r["connected"]
+            print(format_row(r))
             if show_email:
-                em = r.get("email") or "(no email found)"
-                sub = f"↳ {em}"
-                sub_pad = W_BOTH - len(sub)
-                sub_str = c(sub, "dim") + (" " * max(0, sub_pad))
-                print(b("│ ") + f"{sp:<{W_ACC}}" + b(" │ ") + sub_str + b(" │"))
-
-    print(b(f"╰─{dash_acc}─┴─{dash_data}─┴─{dash_data}─╯"))
+                print(format_email_row(r.get("email")))
+        print(b(f"╰─{dash_acc}─┴─{dash_data}─┴─{dash_data}─╯"))
     PYEOF
   '';
 in {
