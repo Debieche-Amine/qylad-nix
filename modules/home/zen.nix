@@ -52,6 +52,13 @@
         "privacy.globalprivacycontrol.enabled" = true;
         "zen.workspaces.continue-where-left-off" = true;
 
+        # Language, Locale & Translation
+        "intl.accept_languages" = "en-US, en, ar, fr"; # English first, Arabic second, French fallback
+        "intl.locale.requested" = "en-US";
+        "browser.translations.enable" = true;
+        "browser.translations.automaticallyPopup" = true; # Prompt translation on foreign pages
+        "layout.spellcheckDefault" = 2; # Multi-line and single-line spellcheck
+
         # -------------------------------------------------------------
         # Compact / Floating UI Mode (Uncomment below to try)
         # -------------------------------------------------------------
