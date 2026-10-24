@@ -17,7 +17,6 @@
 
     # Ensure Hyprland and session apps only use the integrated Intel GPU
     # to avoid holding wake locks on the discrete NVIDIA card
-    export AQ_DRM_DEVICES="/dev/dri/by-path/pci-0000:00:02.0-card"
     export __EGL_VENDOR_LIBRARY_FILENAMES="/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json"
     export VK_DRIVER_FILES="/run/opengl-driver/share/vulkan/icd.d/intel_icd.x86_64.json"
   '';
