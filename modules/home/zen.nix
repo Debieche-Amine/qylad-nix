@@ -1,7 +1,4 @@
-{
-  inputs,
-  ...
-}: {
+{inputs, ...}: {
   imports = [
     inputs.zen-browser.homeModules.beta
   ];
@@ -47,19 +44,21 @@
       # Betterfox: performance, smooth scrolling, and de-bloat preset
       presets.betterfox.enable = true;
 
-      # Arc-inspired & Linux-tailored settings
+      # Profile preferences (user.js)
       settings = {
-        # Arc-like navigation & UI
-        "zen.view.compact.hide-tabbar" = true; # Auto-collapse vertical tabs to maximize screen space
-        "zen.urlbar.behavior" = "float"; # Floating Spotlight/Raycast-style Command Bar
-        "zen.widget.linux.transparency" = true; # Linux transparency/blur support
-        "zen.workspaces.continue-where-left-off" = true;
-        "zen.tabs.vertical.expand-on-hover" = true; # Expand sidebar smoothly when hovering
-
-        # Media & Privacy Hygiene
+        # General & Privacy hygiene
         "media.autoplay.default" = 5; # Block annoying video/audio autoplay by default
         "privacy.donottrackheader.enabled" = true;
         "privacy.globalprivacycontrol.enabled" = true;
+        "zen.workspaces.continue-where-left-off" = true;
+
+        # -------------------------------------------------------------
+        # Compact / Floating UI Mode (Uncomment below to try)
+        # -------------------------------------------------------------
+        # "zen.view.compact.hide-tabbar" = true;       # Auto-hide sidebar tabs
+        # "zen.tabs.vertical.expand-on-hover" = true; # Expand sidebar when hovered
+        # "zen.urlbar.behavior" = "float";            # Floating Spotlight-style Command Bar
+        # "zen.widget.linux.transparency" = true;      # Linux transparency/blur support
       };
 
       # Declarative Containers for clean cookie/session isolation
