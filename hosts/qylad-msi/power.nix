@@ -225,6 +225,7 @@ in {
   boot.extraModprobeConfig = ''
     options nvidia NVreg_TemporaryFilePath=/var/tmp
     options nvidia NVreg_EnableGpuFirmware=0
+    options snd_hda_intel power_save=1 power_save_controller=Y
   '';
 
   # PCIe runtime PM rules:
@@ -273,17 +274,17 @@ in {
       Disable_BDPROCHOT: False
 
       [UNDERVOLT.AC]
-      CORE: 0
-      GPU: 0
-      CACHE: 0
-      UNCORE: 0
+      CORE: -70
+      GPU: -40
+      CACHE: -70
+      UNCORE: -40
       ANALOGIO: 0
 
       [UNDERVOLT.BATTERY]
-      CORE: 0
-      GPU: 0
-      CACHE: 0
-      UNCORE: 0
+      CORE: -70
+      GPU: -40
+      CACHE: -70
+      UNCORE: -40
       ANALOGIO: 0
     '';
   };

@@ -198,6 +198,8 @@ in {
         animate_mouse_windowdragging = true;
         focus_on_activate = true;
         middle_click_paste = false;
+        mouse_move_enables_dpms = true;
+        key_press_enables_dpms = false;
       };
 
       xwayland.force_zero_scaling = true;

@@ -122,6 +122,7 @@ in {
           "${modifier} SHIFT, X, exec, ${uwsm} app -- ${logoutMenu}"
 
           "${modifier}, ESCAPE, exec, ${pkgs.hyprlock}/bin/hyprlock"
+          "${modifier} SHIFT, ESCAPE, exec, ${pkgs.hyprland}/bin/hyprctl dispatch dpms toggle"
           ", PRINT, exec, ${scripts.screenshotFull}/bin/hypr-screenshot-full"
           "${modifier}, PRINT, exec, ${scripts.screenshotRegion}/bin/hypr-screenshot-region"
           "${modifier} ALT, PRINT, exec, ${scripts.screenshotOcr}/bin/hypr-screenshot-ocr"
