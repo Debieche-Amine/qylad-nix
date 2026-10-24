@@ -15,6 +15,8 @@
     btop
     htop
     intel-gpu-tools
+    acpi
+    powertop
     zip
     unzip
     rar
