@@ -39,7 +39,7 @@ PROFILES = {
         "glyph": "󰾆",
         "short": "Bal",
         "governor": "powersave",
-        "epp": "balance_performance",
+        "epp": "balance_power",
         "turbo": False,       # Turbo OFF
         "min_perf_pct": 8,    # 400 MHz
         "max_perf_pct": 43,   # 2.0 GHz
@@ -197,12 +197,43 @@ def apply_hw_settings(gov, epp, turbo, max_perf_pct, min_perf_pct):
     notify_waybar()
 
 
+def apply_hyprland_effects(profile_name):
+    powersave = (profile_name == "powersaver")
+    val_bool = "false" if powersave else "true"
+    batch_cmd = (
+        f"keyword decoration:blur:enabled {val_bool} ; "
+        f"keyword decoration:shadow:enabled {val_bool} ; "
+        f"keyword animations:enabled {val_bool}"
+    )
+    env = os.environ.copy()
+    if "HYPRLAND_INSTANCE_SIGNATURE" not in env:
+        runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+        hypr_instances = glob.glob(os.path.join(runtime_dir, "hypr", "*")) or glob.glob("/tmp/hypr/*")
+        if hypr_instances:
+            latest = max(hypr_instances, key=os.path.getmtime)
+            sig = os.path.basename(latest)
+            if sig:
+                env["HYPRLAND_INSTANCE_SIGNATURE"] = sig
+
+    try:
+        subprocess.run(
+            ["hyprctl", "--batch", batch_cmd],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+    except Exception:
+        pass
+
+
 def set_profile(name):
     if name not in PROFILES:
         print(f"Unknown profile: {name}", file=sys.stderr)
         sys.exit(1)
     p = PROFILES[name]
     apply_hw_settings(p["governor"], p["epp"], p["turbo"], p["max_perf_pct"], p["min_perf_pct"])
+    apply_hyprland_effects(name)
     state = load_state()
     state["base_profile"] = name
     save_state(state)

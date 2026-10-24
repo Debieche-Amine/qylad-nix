@@ -32,7 +32,7 @@ PROFILES = {
         "name": "Balanced",
         "glyph": "󰾆",
         "governor": "powersave",
-        "epp": "balance_performance",
+        "epp": "balance_power",
         "turbo": False,       # Turbo OFF
         "min_perf_pct": 8,    # 400 MHz
         "max_perf_pct": 43,   # 2.0 GHz

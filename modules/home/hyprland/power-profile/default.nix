@@ -183,6 +183,7 @@
       pkgs.coreutils
       pkgs.procps
       pkgs.python3
+      pkgs.hyprland
     ]}:$PATH"
     exec ${pkgs.python3}/bin/python3 ${./ctl.py} "$@"
   '';

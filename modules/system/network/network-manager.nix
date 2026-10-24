@@ -23,12 +23,5 @@
   users.users.${username}.extraGroups = [
     "networkmanager"
   ];
-  networking.networkmanager.wifi.powersave = false;
-
-  boot.extraModprobeConfig = ''
-    options iwlwifi power_save=0
-    options iwlmvm power_scheme=1
-    options iwlwifi uapsd_disable=1
-    options iwlwifi d0i3_disable=1
-  '';
+  networking.networkmanager.wifi.powersave = true;
 }
