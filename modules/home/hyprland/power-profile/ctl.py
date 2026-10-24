@@ -237,6 +237,45 @@ def pct_to_freq_label(pct):
         return f"{mhz / 1000.0:.1f} GHz"
 
 
+def get_gpu_status():
+    gpu_pci = "0000:02:00.0"
+    gpu_path = f"/sys/bus/pci/devices/{gpu_pci}"
+    if not os.path.exists(gpu_path):
+        return {"present": False, "mode": "off", "status": "Off (0W)", "power_state": "D3cold"}
+
+    ctrl = read_sysfs(f"{gpu_path}/power/control", "auto")
+    rt_status = read_sysfs(f"{gpu_path}/power/runtime_status", "unknown")
+    pwr_state = read_sysfs(f"{gpu_path}/power_state", "D0")
+
+    if ctrl == "auto":
+        mode = "auto"
+        status = f"Auto ({pwr_state}/{rt_status})"
+    else:
+        mode = "on"
+        status = f"On ({pwr_state})"
+
+    return {
+        "present": True,
+        "mode": mode,
+        "status": status,
+        "power_state": pwr_state,
+        "runtime_status": rt_status,
+        "control": ctrl,
+    }
+
+
+def set_gpu(mode):
+    if mode not in ("off", "auto", "on"):
+        print(f"Invalid GPU mode: {mode}", file=sys.stderr)
+        sys.exit(1)
+    cmd = ["nvidia-power", mode]
+    try:
+        subprocess.run(cmd, check=True)
+    except FileNotFoundError:
+        subprocess.run(["/run/current-system/sw/bin/nvidia-power", mode], check=True)
+    notify_waybar()
+
+
 def get_full_status():
     hw = get_hw_state()
     state = load_state()
@@ -267,6 +306,7 @@ def get_full_status():
         "max_perf_pct": hw["max_perf_pct"],
         "avg_freq_ghz": hw["avg_freq_ghz"],
         "temp_c": hw["temp_c"],
+        "gpu": get_gpu_status(),
     }
 
 
@@ -276,11 +316,14 @@ def print_waybar():
     turbo_str = "ON" if st["turbo"] else "OFF"
     min_str = pct_to_freq_label(st['min_perf_pct'])
     max_str = pct_to_freq_label(st['max_perf_pct'])
+    gpu = st.get("gpu", {})
+    gpu_str = gpu.get("status", "Unknown")
     tooltip = (
         f"Profile: {st['display_name']}\n"
         f"Governor: {st['governor']}  |  EPP: {st['epp']}\n"
         f"Limits: {min_str} – {max_str} (Turbo: {turbo_str})\n"
-        f"CPU: {st['avg_freq_ghz']:.2f} GHz  |  Temp: {st['temp_c']}°C"
+        f"CPU: {st['avg_freq_ghz']:.2f} GHz  |  Temp: {st['temp_c']}°C\n"
+        f"NVIDIA: {gpu_str}"
     )
     out = {
         "text": text,
@@ -307,6 +350,10 @@ def main():
     sp_param.add_argument("--min-perf-pct", type=int)
     sp_param.add_argument("--max-perf-pct", type=int)
 
+    # set-gpu
+    sp_gpu = subparsers.add_parser("set-gpu")
+    sp_gpu.add_argument("mode", choices=["off", "auto", "on"])
+
     # reset
     subparsers.add_parser("reset")
 
@@ -326,6 +373,8 @@ def main():
         set_profile(args.name)
     elif args.command == "set-param":
         set_param(args)
+    elif args.command == "set-gpu":
+        set_gpu(args.mode)
     elif args.command == "reset":
         reset_to_base()
     elif args.command == "get-json":

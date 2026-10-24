@@ -4,8 +4,9 @@ in {
   mkWaylandTestContainer = {
     username,
     sshPort,
+    autoStart ? false,
   }: {
-    autoStart = true;
+    inherit autoStart;
 
     bindMounts = wayland.bindMounts;
 

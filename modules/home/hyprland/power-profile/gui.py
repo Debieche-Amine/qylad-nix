@@ -287,6 +287,7 @@ class PowerProfileWindow(Gtk.Window):
         self.profile_buttons = {}
         self.gov_buttons = {}
         self.epp_buttons = {}
+        self.gpu_buttons = {}
         self.min_tier_buttons = {}
         self.max_tier_buttons = {}
 
@@ -405,7 +406,27 @@ class PowerProfileWindow(Gtk.Window):
             epp_box.pack_start(btn, True, True, 0)
         card.pack_start(epp_box, False, False, 0)
 
-        # 3c. Turbo Boost
+        # 3c. NVIDIA dGPU
+        gpu_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        gpu_lbl = Gtk.Label(label="󰢮  NVIDIA dGPU:")
+        gpu_lbl.set_xalign(0.0)
+        gpu_lbl.set_size_request(150, -1)
+        gpu_box.pack_start(gpu_lbl, False, False, 0)
+
+        gpu_options = [
+            ("off", "󰐥 Off (0W)"),
+            ("auto", "󰁪 Auto"),
+            ("on", "󰓅 On"),
+        ]
+        for val, label in gpu_options:
+            btn = Gtk.Button(label=label)
+            btn.get_style_context().add_class("pill-btn")
+            btn.connect("clicked", self.on_gpu_clicked, val)
+            self.gpu_buttons[val] = btn
+            gpu_box.pack_start(btn, True, True, 0)
+        card.pack_start(gpu_box, False, False, 0)
+
+        # 3d. Turbo Boost
         turbo_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         turbo_lbl = Gtk.Label(label="󰚥  Intel Turbo Boost:")
         turbo_lbl.set_xalign(0.0)
@@ -530,8 +551,9 @@ class PowerProfileWindow(Gtk.Window):
         # Header status
         glyph = st.get("glyph", "󰾆")
         disp_name = st.get("display_name", "Balanced")
+        gpu_mode_str = st.get("gpu", {}).get("mode", "auto").title()
         self.status_title.set_text(f"{glyph}  {disp_name}")
-        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C")
+        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C   •   󰢮  {gpu_mode_str}")
 
         # Preset profile buttons
         active_prof = st.get("active_profile", "")
@@ -553,6 +575,14 @@ class PowerProfileWindow(Gtk.Window):
         curr_epp = st.get("epp", "balance_performance")
         for epp, btn in self.epp_buttons.items():
             if epp == curr_epp:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        # GPU buttons
+        curr_gpu_mode = st.get("gpu", {}).get("mode", "auto")
+        for mode, btn in self.gpu_buttons.items():
+            if mode == curr_gpu_mode:
                 btn.get_style_context().add_class("active")
             else:
                 btn.get_style_context().remove_class("active")
@@ -586,12 +616,21 @@ class PowerProfileWindow(Gtk.Window):
         st = get_status()
         glyph = st.get("glyph", "󰾆")
         disp_name = st.get("display_name", "Balanced")
+        gpu_mode_str = st.get("gpu", {}).get("mode", "auto").title()
         self.status_title.set_text(f"{glyph}  {disp_name}")
-        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C")
+        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C   •   󰢮  {gpu_mode_str}")
 
         active_prof = st.get("active_profile", "")
         for key, btn in self.profile_buttons.items():
             if key == active_prof:
+                btn.get_style_context().add_class("active")
+            else:
+                btn.get_style_context().remove_class("active")
+
+        # GPU buttons
+        curr_gpu_mode = st.get("gpu", {}).get("mode", "auto")
+        for mode, btn in self.gpu_buttons.items():
+            if mode == curr_gpu_mode:
                 btn.get_style_context().add_class("active")
             else:
                 btn.get_style_context().remove_class("active")
@@ -612,8 +651,13 @@ class PowerProfileWindow(Gtk.Window):
 
     def on_poll_timer(self):
         st = get_status()
-        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C")
+        gpu_mode_str = st.get("gpu", {}).get("mode", "auto").title()
+        self.status_sub.set_text(f"󰍛  {st.get('avg_freq_ghz', 0):.2f} GHz   •   󰔏  {st.get('temp_c', 0)}°C   •   󰢮  {gpu_mode_str}")
         return True
+
+    def on_gpu_clicked(self, widget, mode):
+        run_ctl(["set-gpu", mode])
+        self.refresh_ui()
 
     def on_profile_clicked(self, widget, prof_key):
         run_ctl(["set-profile", prof_key])

@@ -183,8 +183,25 @@ in {
     }
   ];
 
-  # High performance governor for instant responsiveness
-  powerManagement.cpuFreqGovernor = "performance";
+  # Baseline kernel parameters for PCIe and display power saving (beneficial on both AC and Battery)
+  boot.kernelParams = [
+    # Force PCIe Active State Power Management across NVMe SSD, Wi-Fi, and PCIe root ports
+    "pcie_aspm=force"
+    "pcie_aspm.policy=powersupersave"
+
+    # Intel UHD Graphics power saving (Framebuffer Compression & Panel Self Refresh)
+    "i915.enable_fbc=1"
+    "i915.enable_psr=1"
+  ];
+
+  # Defer kernel dirty page writebacks to keep NVMe SSD in low-power sleep (APST) instead of waking every 5s
+  boot.kernel.sysctl = {
+    "vm.dirty_writeback_centisecs" = 6000;
+    "vm.laptop_mode" = 5;
+  };
+
+  # Powertop auto-tuning at boot for idle peripherals
+  powerManagement.powertop.enable = true;
 
   # Enable fine-grained PCIe runtime power management (RTD3/D3cold) for Turing dGPU (GTX 1650)
   # Drops idle power consumption from ~3W (D3hot/active) to 0W (D3cold) when not running offloaded tasks

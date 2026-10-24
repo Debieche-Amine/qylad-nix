@@ -92,6 +92,7 @@ in {
       sshPort = 20000;
     };
     container-gnome = mkGnomeContainer {
+      autoStart = false;
       username = "gnome";
       sshPort = 20001;
       noVncPort = 6080;
