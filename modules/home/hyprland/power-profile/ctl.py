@@ -187,6 +187,40 @@ def apply_hw_settings(gov, epp, turbo, max_perf_pct, min_perf_pct):
         for p in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq/energy_performance_preference"):
             write_sysfs(p, epp)
         write_sysfs("/sys/devices/system/cpu/intel_pstate/no_turbo", no_turbo)
+
+        turbo_max_khz = 4700000
+        try:
+            curr_info_max = int(read_sysfs("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq", "0"))
+            if curr_info_max > turbo_max_khz:
+                turbo_max_khz = curr_info_max
+        except Exception:
+            pass
+
+        base_khz = 1100000
+        try:
+            base_khz = int(read_sysfs("/sys/devices/system/cpu/cpu0/cpufreq/base_frequency", "1100000"))
+        except Exception:
+            pass
+
+        cpuinfo_min = 400000
+        try:
+            cpuinfo_min = int(read_sysfs("/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq", "400000"))
+        except Exception:
+            pass
+
+        target_max = int((turbo_max_khz * max_perf_pct) / 100)
+        if not turbo and target_max > base_khz:
+            target_max = base_khz
+
+        target_min = max(cpuinfo_min, int((turbo_max_khz * min_perf_pct) / 100))
+        target_min = min(target_min, target_max)
+
+        for cpu_path in glob.glob("/sys/devices/system/cpu/cpu*/cpufreq"):
+            write_sysfs(f"{cpu_path}/scaling_max_freq", str(turbo_max_khz))
+            write_sysfs(f"{cpu_path}/scaling_min_freq", str(target_min))
+            write_sysfs(f"{cpu_path}/scaling_max_freq", str(target_max))
+            write_sysfs(f"{cpu_path}/scaling_min_freq", str(target_min))
+
         write_sysfs("/sys/devices/system/cpu/intel_pstate/min_perf_pct", str(min_perf_pct))
         write_sysfs("/sys/devices/system/cpu/intel_pstate/max_perf_pct", str(max_perf_pct))
         write_sysfs("/sys/devices/system/cpu/intel_pstate/min_perf_pct", str(min_perf_pct))

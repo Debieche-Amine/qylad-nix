@@ -146,10 +146,17 @@
     # Check if AC adapter (ADP1) is online (1 = AC connected, 0 = on battery)
     IS_ONLINE="$(cat /sys/class/power_supply/ADP1/online 2>/dev/null || echo 1)"
 
+    STATE_FILE="/run/power-auto-switch-last-state"
+    LAST_STATE="$(cat "$STATE_FILE" 2>/dev/null || echo "")"
+    if [ "$IS_ONLINE" = "$LAST_STATE" ]; then
+      exit 0
+    fi
+    echo "$IS_ONLINE" > "$STATE_FILE"
+
     if [ "$IS_ONLINE" = "1" ]; then
       TARGET="balanced"
       # Apply balanced profile hardware limits: powersave, balance_power, turbo off, max 43%, min 8%
-      ${powerProfileBackend}/bin/power-profile-backend apply powersave balance_power 0 43 8
+      ${powerProfileBackend}/bin/power-profile-backend apply powersave balance_power 1 43 8
     else
       TARGET="powersaver"
       # Apply powersaver profile hardware limits: powersave, power, turbo off, max 17%, min 8%

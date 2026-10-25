@@ -40,7 +40,7 @@ in {
     ../../modules/system/services/ip-monitor.nix
     ../../modules/system/services/ydotool.nix
     # ../../modules/system/services/tlp.nix
-    ../../modules/system/services/good-morning-chatgpt.nix
+    # ../../modules/system/services/good-morning-chatgpt.nix
     ../../modules/system/services/upower.nix
     ../../modules/system/services/geoclue.nix
     # ../../modules/system/services/hirara-vm.nix
