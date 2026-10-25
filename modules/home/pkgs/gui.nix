@@ -13,7 +13,7 @@
     })
     pkgs.discord
     pkgs.spotify
-    pkgs.musescore
+    pkgs.unstable.musescore
     pkgs.gnome-weather
     pkgs.libreoffice
 
