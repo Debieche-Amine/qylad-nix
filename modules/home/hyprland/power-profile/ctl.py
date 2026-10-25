@@ -226,6 +226,14 @@ def apply_hyprland_effects(profile_name):
     except Exception:
         pass
 
+    try:
+        if powersave:
+            subprocess.run(["systemctl", "--user", "stop", "waybar.service"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            subprocess.run(["systemctl", "--user", "start", "waybar.service"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
 
 def set_profile(name):
     if name not in PROFILES:

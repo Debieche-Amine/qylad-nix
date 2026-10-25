@@ -30,10 +30,10 @@ in {
 
     ../../modules/system/services/duckdns.nix
     # ../../modules/system/services/sql.nix
-    ../../modules/system/services/postgresql.nix
+    # ../../modules/system/services/postgresql.nix
     ../../modules/system/services/ssh.nix
     # ../../modules/system/services/litellm
-    ../../modules/system/services/ollama.nix
+    # ../../modules/system/services/ollama.nix
     ../../modules/system/services/extra.nix
     # ../../modules/system/services/agent-zero.nix
     # ../../modules/system/services/tor.nix
