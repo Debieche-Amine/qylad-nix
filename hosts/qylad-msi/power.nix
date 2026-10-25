@@ -140,9 +140,37 @@
         ;;
     esac
   '';
+
+  powerAutoSwitch = pkgs.writeShellScriptBin "power-auto-switch" ''
+    set -eu
+    # Check if AC adapter (ADP1) is online (1 = AC connected, 0 = on battery)
+    IS_ONLINE="$(cat /sys/class/power_supply/ADP1/online 2>/dev/null || echo 1)"
+
+    if [ "$IS_ONLINE" = "1" ]; then
+      TARGET="balanced"
+      # Apply balanced profile hardware limits: powersave, balance_power, turbo off, max 43%, min 8%
+      ${powerProfileBackend}/bin/power-profile-backend apply powersave balance_power 0 43 8
+    else
+      TARGET="powersaver"
+      # Apply powersaver profile hardware limits: powersave, power, turbo off, max 17%, min 8%
+      ${powerProfileBackend}/bin/power-profile-backend apply powersave power 1 17 8
+    fi
+
+    # Update active user session if logged into Hyprland (updates Waybar icon, disables blur/shadows on powersave)
+    for udir in /run/user/*; do
+      [ -d "$udir" ] || continue
+      uid="''${udir##*/}"
+      uname="$(id -nu "$uid" 2>/dev/null || true)"
+      [ -n "$uname" ] || continue
+      if [ -d "$udir/hypr" ] || [ -S "$udir/wayland-1" ]; then
+        su - "$uname" -c "env XDG_RUNTIME_DIR='$udir' power-profile-ctl set-profile '$TARGET'" 2>/dev/null || true
+      fi
+    done
+  '';
 in {
   environment.systemPackages = [
     powerProfileBackend
+    powerAutoSwitch
     nvidiaPower
     (pkgs.writeShellScriptBin "nvidia-offload" ''
       if [ ! -d /sys/bus/pci/devices/0000:02:00.0 ]; then
@@ -172,6 +200,14 @@ in {
           options = ["NOPASSWD"];
         }
         {
+          command = "${powerAutoSwitch}/bin/power-auto-switch";
+          options = ["NOPASSWD"];
+        }
+        {
+          command = "/run/current-system/sw/bin/power-auto-switch";
+          options = ["NOPASSWD"];
+        }
+        {
           command = "${nvidiaPower}/bin/nvidia-power";
           options = ["NOPASSWD"];
         }
@@ -192,12 +228,16 @@ in {
     # Intel UHD Graphics power saving (Framebuffer Compression & Panel Self Refresh)
     "i915.enable_fbc=1"
     "i915.enable_psr=1"
+
+    # USB autosuspend after 2 seconds for idle peripherals
+    "usbcore.autosuspend=2"
   ];
 
   # Defer kernel dirty page writebacks to keep NVMe SSD in low-power sleep (APST) instead of waking every 5s
   boot.kernel.sysctl = {
     "vm.dirty_writeback_centisecs" = 6000;
     "vm.laptop_mode" = 5;
+    "kernel.nmi_watchdog" = 0;
   };
 
   # Powertop auto-tuning at boot for idle peripherals
@@ -239,6 +279,9 @@ in {
 
     # Enable runtime PM for NVIDIA GPU
     ACTION=="add|bind", SUBSYSTEM=="pci", ATTR{vendor}=="0x10de", ATTR{class}=="0x03[0-9]*", TEST=="power/control", ATTR{power/control}="auto"
+
+    # Auto-switch power profile on AC connect/disconnect (balanced on AC, powersaver on battery)
+    SUBSYSTEM=="power_supply", KERNEL=="ADP1", ACTION=="add|change", RUN+="${powerAutoSwitch}/bin/power-auto-switch"
   '';
 
   # Thermal management daemon to proactively handle thermal zones

@@ -49,9 +49,9 @@ in {
         "${pkgs.hyprland}/bin/hyprctl dispatch workspace name:A:0"
         "[workspace name:A:0 silent] ${uwsm} app -- ${terminal} --directory ${repoDir}"
         "[workspace name:A:0 silent] ${uwsm} app -- ${terminal} --directory ${repoDir}"
-        "[workspace special:s1 silent] ${uwsm} app -- ${excalidrawDesktop}/bin/excalidraw-desktop"
+        # "[workspace special:s1 silent] ${uwsm} app -- ${excalidrawDesktop}/bin/excalidraw-desktop"
         "[workspace name:A:1 silent] ${uwsm} app -- ${terminal}"
-        "[workspace special:scratchpad silent] ${uwsm} app -- ${terminal} ${pkgs.btop}/bin/btop"
+        # "[workspace special:scratchpad silent] ${uwsm} app -- ${terminal} ${pkgs.btop}/bin/btop"
 
         "[workspace name:Z:0 silent] ${uwsm} app -- ${terminal} --directory ${config.home.homeDirectory}/notes"
         "[workspace name:Z:0 silent] ${uwsm} app -- ${terminal} --directory ${config.home.homeDirectory}/notes"

@@ -227,4 +227,14 @@ in {
     powerProfileCtl
     powerProfileGui
   ];
+
+  wayland.windowManager.hyprland.settings.exec-once = [
+    (pkgs.writeShellScript "power-profile-init" ''
+      if [ "$(${pkgs.coreutils}/bin/cat /sys/class/power_supply/ADP1/online 2>/dev/null || echo 1)" = "0" ]; then
+        ${powerProfileCtl}/bin/power-profile-ctl set-profile powersaver
+      else
+        ${powerProfileCtl}/bin/power-profile-ctl set-profile balanced
+      fi
+    '').outPath
+  ];
 }
