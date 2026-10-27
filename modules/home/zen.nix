@@ -37,6 +37,12 @@
           installation_mode = "force_installed";
           install_url = "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi";
         };
+
+        # MetaMask Crypto Wallet
+        "webextension@metamask.io" = {
+          installation_mode = "force_installed";
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/ether-metamask/latest.xpi";
+        };
       };
     };
 
@@ -68,36 +74,182 @@
         # "zen.widget.linux.transparency" = true;      # Linux transparency/blur support
       };
 
+      # Pin extensions to the toolbar navigation bar for quick access
+      extensionButtons = {
+        "nav-bar" = [
+          "webextension@metamask.io"
+        ];
+      };
+
+      # Declarative Search Engines: Google default + quick keyword aliases
+      search = {
+        force = true;
+        default = "Google";
+        engines = {
+          "Nix Packages" = {
+            urls = [
+              {
+                template = "https://search.nixos.org/packages";
+                params = [
+                  {
+                    name = "type";
+                    value = "packages";
+                  }
+                  {
+                    name = "query";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@np"];
+          };
+          "NixOS Options" = {
+            urls = [
+              {
+                template = "https://search.nixos.org/options";
+                params = [
+                  {
+                    name = "type";
+                    value = "packages";
+                  }
+                  {
+                    name = "query";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@no"];
+          };
+          "Home Manager Options" = {
+            urls = [
+              {
+                template = "https://home-manager-options.extranix.com/";
+                params = [
+                  {
+                    name = "query";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@hm"];
+          };
+          "GitHub" = {
+            urls = [
+              {
+                template = "https://github.com/search";
+                params = [
+                  {
+                    name = "q";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@gh"];
+          };
+          "YouTube" = {
+            urls = [
+              {
+                template = "https://www.youtube.com/results";
+                params = [
+                  {
+                    name = "search_query";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@yt"];
+          };
+          "DuckDuckGo" = {
+            urls = [
+              {
+                template = "https://duckduckgo.com/";
+                params = [
+                  {
+                    name = "q";
+                    value = "{searchTerms}";
+                  }
+                ];
+              }
+            ];
+            definedAliases = ["@ddg"];
+          };
+        };
+      };
+
       # Declarative Containers for clean cookie/session isolation
       containersForce = true;
       containers = {
-        Personal = {
+        Sanctuary = {
           id = 1;
-          color = "blue";
-          icon = "fingerprint";
+          color = "turquoise";
+          icon = "chill";
         };
-        Work = {
+        Forge = {
           id = 2;
           color = "orange";
           icon = "briefcase";
         };
       };
 
+      # Route external links (clicked outside browser) into Sanctuary
+      spaceRouting = {
+        defaultExternalRoute = "f280bafe-7813-433e-8a1b-116ed23825e9";
+      };
+
       # Declarative Workspaces (Spaces) linked to containers
+      # (pinsForce is false by default, so extra pins added manually in Zen are preserved)
       spaces = {
-        Personal = {
+        Sanctuary = {
           id = "f280bafe-7813-433e-8a1b-116ed23825e9";
           position = 1000;
-          icon = "🏠";
-          container = 1; # Link to Personal container
+          icon = "🌿";
+          container = 1; # Link to Sanctuary container
+          pins."Instagram" = {
+            id = "733fa051-ef75-48ba-b583-6654905dffb7";
+            url = "https://www.instagram.com";
+            position = 100;
+          };
+          pins."Telegram" = {
+            id = "d7fa769e-5cf6-40b1-a7c2-20c82bdbd1e5";
+            url = "https://web.telegram.org";
+            position = 200;
+          };
         };
-        Work = {
+        Forge = {
           id = "a3d4f478-9d76-46d6-8084-a7fde481b495";
           position = 2000;
-          icon = "💼";
-          container = 2; # Link to Work container
+          icon = "⚡";
+          container = 2; # Link to Forge container
+          pins."GitHub" = {
+            id = "65a535a6-4d7b-43d0-bf7d-4ba28cc066c7";
+            url = "https://github.com";
+            position = 100;
+          };
         };
       };
+
+      # Custom keyboard shortcuts: Alt+Z for Sanctuary (Space 1), Alt+E for Forge (Space 2)
+      keyboardShortcuts = [
+        {
+          id = "zen-workspace-switch-1";
+          key = "z";
+          modifiers = {
+            alt = true;
+          };
+        }
+        {
+          id = "zen-workspace-switch-2";
+          key = "e";
+          modifiers = {
+            alt = true;
+          };
+        }
+      ];
     };
   };
 }
