@@ -184,19 +184,19 @@
       # Declarative Containers for clean cookie/session isolation
       containersForce = true;
       containers = {
-        Sanctuary = {
+        Nexus = {
           id = 1;
-          color = "turquoise";
-          icon = "chill";
+          color = "purple";
+          icon = "fingerprint";
         };
-        Forge = {
+        Lab = {
           id = 2;
-          color = "orange";
-          icon = "briefcase";
+          color = "green";
+          icon = "circle";
         };
       };
 
-      # Route external links (clicked outside browser) into Sanctuary
+      # Route external links (clicked outside browser) into Nexus
       spaceRouting = {
         defaultExternalRoute = "f280bafe-7813-433e-8a1b-116ed23825e9";
       };
@@ -204,11 +204,11 @@
       # Declarative Workspaces (Spaces) linked to containers
       # (pinsForce is false by default, so extra pins added manually in Zen are preserved)
       spaces = {
-        Sanctuary = {
+        Nexus = {
           id = "f280bafe-7813-433e-8a1b-116ed23825e9";
           position = 1000;
-          icon = "🌿";
-          container = 1; # Link to Sanctuary container
+          icon = "🪐";
+          container = 1; # Link to Nexus container
           pins."Instagram" = {
             id = "733fa051-ef75-48ba-b583-6654905dffb7";
             url = "https://www.instagram.com";
@@ -220,11 +220,11 @@
             position = 200;
           };
         };
-        Forge = {
+        Lab = {
           id = "a3d4f478-9d76-46d6-8084-a7fde481b495";
           position = 2000;
-          icon = "⚡";
-          container = 2; # Link to Forge container
+          icon = "🧪";
+          container = 2; # Link to Lab container
           pins."GitHub" = {
             id = "65a535a6-4d7b-43d0-bf7d-4ba28cc066c7";
             url = "https://github.com";
@@ -233,7 +233,7 @@
         };
       };
 
-      # Custom keyboard shortcuts: Alt+Z for Sanctuary (Space 1), Alt+E for Forge (Space 2)
+      # Custom keyboard shortcuts: Alt+Z for Nexus (Space 1), Alt+E for Lab (Space 2)
       keyboardShortcuts = [
         {
           id = "zen-workspace-switch-1";
