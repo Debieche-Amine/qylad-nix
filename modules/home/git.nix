@@ -7,8 +7,8 @@
     enable = true;
 
     settings = {
-      user.name = "Qylad";
-      user.email = "qylad@porton.me";
+      user.name = "Amine";
+      user.email = "Debieche-Amine@users.noreply.github.com";
       signing = {
         format = "ssh";
         key = "${config.home.homeDirectory}/.ssh/qylad-msi.pub";

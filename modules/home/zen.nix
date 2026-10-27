@@ -69,6 +69,7 @@
       };
 
       # Declarative Containers for clean cookie/session isolation
+      containersForce = true;
       containers = {
         Personal = {
           id = 1;
