@@ -290,6 +290,11 @@
             url = "https://web.telegram.org";
             position = 200;
           };
+          pins."Messenger" = {
+            id = "bf0d446f-2ff7-430c-854b-c85f9474ac29";
+            url = "https://www.messenger.com";
+            position = 300;
+          };
         };
         Lab = {
           id = "a3d4f478-9d76-46d6-8084-a7fde481b495";
