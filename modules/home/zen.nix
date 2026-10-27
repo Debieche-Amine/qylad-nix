@@ -82,6 +82,22 @@
           icon = "briefcase";
         };
       };
+
+      # Declarative Workspaces (Spaces) linked to containers
+      spaces = {
+        Personal = {
+          id = "f280bafe-7813-433e-8a1b-116ed23825e9";
+          position = 1000;
+          icon = "🏠";
+          container = 1; # Link to Personal container
+        };
+        Work = {
+          id = "a3d4f478-9d76-46d6-8084-a7fde481b495";
+          position = 2000;
+          icon = "💼";
+          container = 2; # Link to Work container
+        };
+      };
     };
   };
 }
