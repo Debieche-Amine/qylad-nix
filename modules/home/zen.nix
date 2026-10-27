@@ -309,8 +309,9 @@
         };
       };
 
-      # Custom keyboard shortcuts: Alt+Z for Nexus (Space 1), Alt+E for Lab (Space 2)
+      # Custom keyboard shortcuts
       keyboardShortcuts = [
+        # Workspaces: Alt+Z for Nexus (Space 1), Alt+E for Lab (Space 2)
         {
           id = "zen-workspace-switch-1";
           key = "z";
@@ -322,6 +323,35 @@
           id = "zen-workspace-switch-2";
           key = "e";
           modifiers = {
+            alt = true;
+          };
+        }
+
+        # Toggle Vertical Sidebar (Ctrl+B)
+        {
+          id = "zen-toggle-sidebar";
+          key = "b";
+          modifiers = {
+            control = true;
+          };
+        }
+
+        # Duplicate Tab (Ctrl+Alt+T)
+        {
+          id = "zen-duplicate-tab";
+          key = "t";
+          modifiers = {
+            control = true;
+            alt = true;
+          };
+        }
+
+        # Reset Pinned Tab to home URL (Ctrl+Alt+R)
+        {
+          id = "zen-pinned-tab-reset-shortcut";
+          key = "r";
+          modifiers = {
+            control = true;
             alt = true;
           };
         }
