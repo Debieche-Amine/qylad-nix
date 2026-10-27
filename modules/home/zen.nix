@@ -86,6 +86,7 @@
         force = true;
         default = "Google";
         engines = {
+          # Nix & Development
           "Nix Packages" = {
             urls = [
               {
@@ -122,6 +123,10 @@
             ];
             definedAliases = ["@no"];
           };
+          "NixOS Wiki" = {
+            urls = [{template = "https://wiki.nixos.org/w/index.php?search={searchTerms}";}];
+            definedAliases = ["@nw"];
+          };
           "Home Manager Options" = {
             urls = [
               {
@@ -150,6 +155,34 @@
             ];
             definedAliases = ["@gh"];
           };
+
+          # Rust Ecosystem
+          "Crates.io" = {
+            urls = [{template = "https://crates.io/search?q={searchTerms}";}];
+            definedAliases = ["@crate"];
+          };
+          "Docs.rs" = {
+            urls = [{template = "https://docs.rs/releases/search?query={searchTerms}";}];
+            definedAliases = ["@rs"];
+          };
+          "Rust Standard Library" = {
+            urls = [{template = "https://doc.rust-lang.org/std/?search={searchTerms}";}];
+            definedAliases = ["@rstd"];
+          };
+
+          # General & Linux Knowledge
+          "Arch Wiki" = {
+            urls = [{template = "https://wiki.archlinux.org/index.php?search={searchTerms}";}];
+            definedAliases = ["@aw"];
+          };
+          "Wikipedia" = {
+            urls = [{template = "https://en.wikipedia.org/wiki/Special:Search?search={searchTerms}";}];
+            definedAliases = ["@w"];
+          };
+          "Reddit" = {
+            urls = [{template = "https://www.reddit.com/search/?q={searchTerms}";}];
+            definedAliases = ["@r"];
+          };
           "YouTube" = {
             urls = [
               {
@@ -177,6 +210,44 @@
               }
             ];
             definedAliases = ["@ddg"];
+          };
+
+          # Web3 & Crypto
+          "Etherscan" = {
+            urls = [{template = "https://etherscan.io/search?f=0&q={searchTerms}";}];
+            definedAliases = ["@eth"];
+          };
+          "BscScan" = {
+            urls = [{template = "https://bscscan.com/search?f=0&q={searchTerms}";}];
+            definedAliases = ["@bsc"];
+          };
+          "Mempool (Bitcoin)" = {
+            urls = [{template = "https://mempool.space/search?q={searchTerms}";}];
+            definedAliases = ["@btc"];
+          };
+          "Litecoin Space" = {
+            urls = [{template = "https://litecoinspace.org/search?q={searchTerms}";}];
+            definedAliases = ["@ltc"];
+          };
+          "Solscan" = {
+            urls = [{template = "https://solscan.io/search?q={searchTerms}";}];
+            definedAliases = ["@sol"];
+          };
+          "Arbiscan" = {
+            urls = [{template = "https://arbiscan.io/search?f=0&q={searchTerms}";}];
+            definedAliases = ["@arb"];
+          };
+          "Basescan" = {
+            urls = [{template = "https://basescan.org/search?f=0&q={searchTerms}";}];
+            definedAliases = ["@base"];
+          };
+          "DexScreener" = {
+            urls = [{template = "https://dexscreener.com/search?q={searchTerms}";}];
+            definedAliases = ["@dex"];
+          };
+          "DefiLlama" = {
+            urls = [{template = "https://www.google.com/search?q=site%3Adefillama.com+{searchTerms}";}];
+            definedAliases = ["@defi"];
           };
         };
       };
