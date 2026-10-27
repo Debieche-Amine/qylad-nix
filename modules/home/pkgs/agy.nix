@@ -187,6 +187,17 @@
     '';
   agyWrappers = map mkAgyWrapper (pkgs.lib.range 1 40);
 
+  fakeBrowser = pkgs.runCommand "fake-browser" {} ''
+    mkdir -p $out/bin
+    echo '#!${pkgs.bash}/bin/bash' > $out/bin/xdg-open
+    echo 'kill -TERM $PPID 2>/dev/null || true' >> $out/bin/xdg-open
+    echo 'exit 1' >> $out/bin/xdg-open
+    chmod +x $out/bin/xdg-open
+    for name in x-www-browser www-browser gio open zen zen-beta firefox chromium google-chrome google-chrome-stable; do
+      ln -s xdg-open $out/bin/$name
+    done
+  '';
+
   # agy-usage: Parallel account usage checker querying ~/.gemini/accounts
   agy-usage = pkgs.writeShellScriptBin "agy-usage" ''
     exec ${pkgs.python3}/bin/python3 - "$@" << 'PYEOF'
@@ -215,7 +226,10 @@
     show_email = "-e" in args or "--email" in args
     json_mode = "--json" in args
 
-    accounts_dir = os.path.expanduser("~/.gemini/accounts")
+    home_dir = os.path.expanduser("~")
+    m = re.match(r"^(.*?)/\.gemini/accounts/", home_dir)
+    real_home = m.group(1) if m else home_dir
+    accounts_dir = os.path.join(real_home, ".gemini", "accounts")
     current_file = os.path.join(accounts_dir, ".current")
     current_id = None
     if os.path.exists(current_file):
@@ -409,9 +423,24 @@
             if os.path.exists(ob):
                 os.symlink(ob, os.path.join(tmp_cli, "cache/onboarding.json"))
 
+            fake_bin = "${fakeBrowser}/bin"
+            tmp_bin = os.path.join(tmpdir, "bin")
+            os.makedirs(tmp_bin, exist_ok=True)
+            fake_script = "#!/bin/sh\nkill -TERM $PPID 2>/dev/null || true\nexit 1\n"
+            for b_name in [
+                "xdg-open", "x-www-browser", "www-browser", "gio", "open",
+                "zen", "zen-beta", "firefox", "chromium", "google-chrome", "google-chrome-stable"
+            ]:
+                b_path = os.path.join(tmp_bin, b_name)
+                with open(b_path, "w") as f:
+                    f.write(fake_script)
+                os.chmod(b_path, 0o755)
+
             env = dict(
                 os.environ,
                 HOME=tmpdir,
+                PATH=f"{fake_bin}:{tmp_bin}:" + os.environ.get("PATH", ""),
+                BROWSER=os.path.join(fake_bin, "xdg-open"),
                 DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
                 DO_NOT_TRACK="1",
                 GEMINI_TELEMETRY_ENABLED="false",
@@ -423,7 +452,14 @@
                     stdin=subprocess.DEVNULL,
                     capture_output=True, text=True, timeout=timeout_sec, env=env
                 )
-            except subprocess.TimeoutExpired:
+            except subprocess.TimeoutExpired as e:
+                out_str = (e.stdout or "") if isinstance(e.stdout, str) else (e.stdout or b"").decode("utf-8", "replace")
+                err_str = (e.stderr or "") if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace")
+                low_out = (out_str + "\n" + err_str).lower()
+                if "authentication required" in low_out or "invalid_grant" in low_out or "revoked" in low_out:
+                    return "PERM_ERROR", "Auth expired"
+                if "eligibility check failed" in low_out or "verify your account" in low_out:
+                    return "PERM_ERROR", "Verify in browser"
                 return "TIMED_OUT", None
             except Exception:
                 return "ERROR", None
@@ -491,7 +527,7 @@
             except Exception:
                 pass
 
-        real_home = os.path.expanduser("~")
+        # real_home is resolved at module scope
 
         resolved_event = threading.Event()
         final_res = {}
@@ -670,6 +706,7 @@
                 if h.get("disabled"):
                     raw_h_time = "paused"
                 else:
+                    h_frac = h.get("fraction")
                     h_time, _ = format_time_left(h.get("reset_time"), h.get("desc"), h_frac)
                     raw_h_time = re.sub(r"\033\[[0-9;]*m", "", h_time).strip()
                 item["gemini_5h"] = {
