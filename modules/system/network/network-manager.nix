@@ -15,9 +15,9 @@
   networking.dhcpcd.enable = false;
 
   networking.nameservers = [
+    "9.9.9.9"
+    "149.112.112.112"
     "1.1.1.1"
-    "1.0.0.1"
-    "8.8.8.8"
   ];
 
   users.users.${username}.extraGroups = [
