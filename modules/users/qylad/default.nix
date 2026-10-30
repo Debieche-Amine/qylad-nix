@@ -24,6 +24,7 @@
     ../../home/gnome-text-editor.nix
     ../../home/zoxide.nix
     ../../home/eza.nix
+    ../../home/yazi.nix
     ../../home/direnv.nix
     ../../home/secrets.nix
     ../../home/qutebrowser.nix

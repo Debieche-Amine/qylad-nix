@@ -1,6 +1,6 @@
 {pkgs, ...}: let
-  wallpaperRevision = "02076c7346120871ce4631d203802e6d4dc90ad9";
-  wallpaperFile = "wallpaper_1.jpg";
+  wallpaperRevision = "53e29b35fc242370e13f7dc1413ac8f5054e391e";
+  wallpaperFile = "gruvbox/a_bicycle_leaning_against_a_wall.jpg";
   # Game-GTA.png
   # hamid: cabin-2.jpg
   # moh: Northern%20Lights2.jpg
@@ -8,8 +8,9 @@
   # Northern%20Lights1.jpg // the green one, not bad, not perfect
 
   wallpaper = pkgs.fetchurl {
-    url = "https://raw.githubusercontent.com/harilvfs/wallpapers/${wallpaperRevision}/${wallpaperFile}";
-    hash = "sha256-erVfSu/0bzaAoyzbZmhFjN/SmjuBsAU8VnT2icFQRW8=";
+    # url = "https://raw.githubusercontent.com/harilvfs/wallpapers/${wallpaperRevision}/${wallpaperFile}";
+    url = "https://raw.githubusercontent.com/vyrx-dev/Wallpapers/${wallpaperRevision}/${wallpaperFile}";
+    hash = "sha256-k8gVQqo926dSSdTz+qoBaPctF4WaztSvTyhxT6KUM2I=";
   };
 in {
   stylix = {
