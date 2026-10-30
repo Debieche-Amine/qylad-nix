@@ -46,6 +46,7 @@ in {
   home.packages = [
     pkgs.jq
     pkgs.dust
+    pkgs.glow
     pkgs.xclip
     pkgs.wl-clipboard
     pkgs.gemini-cli
