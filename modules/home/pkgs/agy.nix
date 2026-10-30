@@ -170,7 +170,11 @@
         export HOME="$PROFILE_HOME"
         export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
         export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
-        export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
+        if [ -n "''${AGYN_CACHE_DIR:-}" ]; then
+          export XDG_CACHE_HOME="$AGYN_CACHE_DIR"
+        else
+          export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
+        fi
         export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
         export DO_NOT_TRACK="1"
         export GEMINI_TELEMETRY_ENABLED="false"
