@@ -10,6 +10,7 @@
     settings = {
       vim = {
         undoFile.enable = true;
+        utility.preview.glow.enable = true;
 
         options = {
           ignorecase = true;

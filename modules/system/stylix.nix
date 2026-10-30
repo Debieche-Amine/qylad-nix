@@ -1,6 +1,9 @@
 {pkgs, ...}: let
   wallpaperRevision = "53e29b35fc242370e13f7dc1413ac8f5054e391e";
   wallpaperFile = "gruvbox/a_bicycle_leaning_against_a_wall.jpg";
+  # --- vyrx-dev
+  # gruvbox/a_bicycle_leaning_against_a_wall.jpg
+  # --- harilvfs
   # Game-GTA.png
   # hamid: cabin-2.jpg
   # moh: Northern%20Lights2.jpg
