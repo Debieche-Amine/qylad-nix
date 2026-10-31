@@ -30,6 +30,8 @@
             "run"
             "github:natsukium/mcp-servers-nix#playwright-mcp"
             "--"
+            "--browser"
+            "chromium"
             "--executable-path"
             "${pkgs.chromium}/bin/chromium"
           ];
@@ -80,66 +82,72 @@
   };
 
   agyn = pkgs.writeShellScriptBin "agyn" ''
-        set -euo pipefail
+            set -euo pipefail
 
-        if [ $# -lt 1 ]; then
-          echo "Usage: agyn <account_id> [agy args...]" >&2
-          echo "Example: agyn 2 -p 'hello'" >&2
-          exit 1
-        fi
-
-        ACCOUNT_ID="$1"
-        shift
-
-        REAL_HOME="$HOME"
-        if [[ "$REAL_HOME" =~ (.*)/\.gemini/accounts/ ]]; then
-          REAL_HOME="''${BASH_REMATCH[1]}"
-        fi
-
-        ACCOUNT_DIR="$REAL_HOME/.gemini/accounts/$ACCOUNT_ID"
-        TOKEN_FILE="$ACCOUNT_DIR/antigravity-oauth-token"
-        PROFILE_HOME="$ACCOUNT_DIR/profile"
-        PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
-
-        mkdir -p "$ACCOUNT_DIR" "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini/config"
-
-        ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
-        ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
-        ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
-        ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
-        ln -sf "$REAL_HOME/.gemini/config/mcp_config.json" "$PROFILE_HOME/.gemini/config/mcp_config.json"
-
-        if [ -f "$TOKEN_FILE" ]; then
-          if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
-            cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
-          fi
-        elif [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
-          cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
-          chmod 600 "$TOKEN_FILE"
-        fi
-
-        if [ -f "$ACCOUNT_DIR/email" ]; then
-          cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
-        elif [ -f "$PROFILE_CLI/.cached_email" ]; then
-          cp -f "$PROFILE_CLI/.cached_email" "$ACCOUNT_DIR/email"
-        fi
-
-        cleanup() {
-          if [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
-            cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
-            chmod 600 "$TOKEN_FILE"
-          elif [ -f "$TOKEN_FILE" ]; then
-            cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
-            chmod 600 "$PROFILE_CLI/antigravity-oauth-token"
-          fi
-
-          if [ -f "$TOKEN_FILE" ]; then
-            local email=""
-            if [ -f "$ACCOUNT_DIR/email" ] && [ -s "$ACCOUNT_DIR/email" ]; then
-              email=$(cat "$ACCOUNT_DIR/email" | tr -d '[:space:]')
+            if [ $# -lt 1 ]; then
+              echo "Usage: agyn <account_id> [agy args...]" >&2
+              echo "Example: agyn 2 -p 'hello'" >&2
+              exit 1
             fi
-            if [ -z "$email" ]; then
-              email=$(${pkgs.python3}/bin/python3 - "$TOKEN_FILE" << 'PYEOF' 2>/dev/null || true
+
+            ACCOUNT_ID="$1"
+            shift
+
+            REAL_HOME="$HOME"
+            if [[ "$REAL_HOME" =~ (.*)/\.gemini/accounts/ ]]; then
+              REAL_HOME="''${BASH_REMATCH[1]}"
+            fi
+
+            ACCOUNT_DIR="$REAL_HOME/.gemini/accounts/$ACCOUNT_ID"
+            TOKEN_FILE="$ACCOUNT_DIR/antigravity-oauth-token"
+            PROFILE_HOME="$ACCOUNT_DIR/profile"
+            PROFILE_CLI="$PROFILE_HOME/.gemini/antigravity-cli"
+
+            mkdir -p "$ACCOUNT_DIR" "$PROFILE_CLI/cache" "$PROFILE_HOME/.gemini/config" "$PROFILE_HOME/.config" "$PROFILE_HOME/.local/share"
+
+            ln -sf "$REAL_HOME/.gemini/antigravity-cli/settings.json" "$PROFILE_CLI/settings.json"
+            ln -sf "$REAL_HOME/.gemini/antigravity-cli/cache/onboarding.json" "$PROFILE_CLI/cache/onboarding.json"
+            ln -sf "$REAL_HOME/.gemini/antigravity-cli/jetski_state.pbtxt" "$PROFILE_CLI/jetski_state.pbtxt"
+            ln -sf "$REAL_HOME/.gemini/settings.json" "$PROFILE_HOME/.gemini/settings.json"
+            ln -sf "$REAL_HOME/.gemini/config/mcp_config.json" "$PROFILE_HOME/.gemini/config/mcp_config.json"
+
+            if [ -f "$TOKEN_FILE" ]; then
+              if [ ! -f "$PROFILE_CLI/antigravity-oauth-token" ] || [ "$TOKEN_FILE" -nt "$PROFILE_CLI/antigravity-oauth-token" ]; then
+                cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
+                chmod 600 "$PROFILE_CLI/antigravity-oauth-token"
+              elif [ "$PROFILE_CLI/antigravity-oauth-token" -nt "$TOKEN_FILE" ]; then
+                cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
+                chmod 600 "$TOKEN_FILE"
+              fi
+            elif [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
+              cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
+              chmod 600 "$TOKEN_FILE"
+            fi
+
+            if [ -f "$ACCOUNT_DIR/email" ]; then
+              cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
+            elif [ -f "$PROFILE_CLI/.cached_email" ]; then
+              cp -f "$PROFILE_CLI/.cached_email" "$ACCOUNT_DIR/email"
+            fi
+
+            cleanup() {
+              if [ -f "$PROFILE_CLI/antigravity-oauth-token" ]; then
+                if [ ! -f "$TOKEN_FILE" ] || [ "$PROFILE_CLI/antigravity-oauth-token" -nt "$TOKEN_FILE" ]; then
+                  cp -f "$PROFILE_CLI/antigravity-oauth-token" "$TOKEN_FILE"
+                  chmod 600 "$TOKEN_FILE"
+                fi
+              elif [ -f "$TOKEN_FILE" ]; then
+                cp -f "$TOKEN_FILE" "$PROFILE_CLI/antigravity-oauth-token"
+                chmod 600 "$PROFILE_CLI/antigravity-oauth-token"
+              fi
+
+              if [ -f "$TOKEN_FILE" ]; then
+                local email=""
+                if [ -f "$ACCOUNT_DIR/email" ] && [ -s "$ACCOUNT_DIR/email" ]; then
+                  email=$(cat "$ACCOUNT_DIR/email" | tr -d '[:space:]')
+                fi
+                if [ -z "$email" ]; then
+                  email=$(${pkgs.python3}/bin/python3 - "$TOKEN_FILE" << 'PYEOF' 2>/dev/null || true
     import sys, json, base64
     try:
         with open(sys.argv[1]) as f:
@@ -154,35 +162,35 @@
         pass
     PYEOF
     )
-              if [ -n "$email" ]; then
-                echo "$email" > "$ACCOUNT_DIR/email"
+                  if [ -n "$email" ]; then
+                    echo "$email" > "$ACCOUNT_DIR/email"
+                  fi
+                fi
+                if [ -n "$email" ]; then
+                  cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
+                fi
               fi
+            }
+            trap cleanup EXIT INT TERM
+
+            echo "$ACCOUNT_ID" > "$REAL_HOME/.gemini/accounts/.current" 2>/dev/null || true
+
+            export HOME="$PROFILE_HOME"
+            export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
+            export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
+            if [ -n "''${AGYN_CACHE_DIR:-}" ]; then
+              export XDG_CACHE_HOME="$AGYN_CACHE_DIR"
+            else
+              export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
             fi
-            if [ -n "$email" ]; then
-              cp -f "$ACCOUNT_DIR/email" "$PROFILE_CLI/.cached_email"
-            fi
-          fi
-        }
-        trap cleanup EXIT INT TERM
+            export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
+            export DO_NOT_TRACK="1"
+            export GEMINI_TELEMETRY_ENABLED="false"
+            export GOPATH="$REAL_HOME/go"
+            export CARGO_HOME="$REAL_HOME/.cargo"
+            export RUSTUP_HOME="$REAL_HOME/.rustup"
 
-        echo "$ACCOUNT_ID" > "$REAL_HOME/.gemini/accounts/.current" 2>/dev/null || true
-
-        export HOME="$PROFILE_HOME"
-        export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
-        export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
-        if [ -n "''${AGYN_CACHE_DIR:-}" ]; then
-          export XDG_CACHE_HOME="$AGYN_CACHE_DIR"
-        else
-          export XDG_CACHE_HOME="/tmp/agy-cache-$ACCOUNT_ID"
-        fi
-        export DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket"
-        export DO_NOT_TRACK="1"
-        export GEMINI_TELEMETRY_ENABLED="false"
-        export GOPATH="$REAL_HOME/go"
-        export CARGO_HOME="$REAL_HOME/.cargo"
-        export RUSTUP_HOME="$REAL_HOME/.rustup"
-
-        "${antigravityCli}/bin/agy" "$@"
+            "${antigravityCli}/bin/agy" "$@"
   '';
 
   mkAgyWrapper = id:
@@ -191,17 +199,6 @@
     '';
   agyWrappers = map mkAgyWrapper (pkgs.lib.range 1 40);
 
-  fakeBrowser = pkgs.runCommand "fake-browser" {} ''
-    mkdir -p $out/bin
-    echo '#!${pkgs.bash}/bin/bash' > $out/bin/xdg-open
-    echo 'kill -TERM $PPID 2>/dev/null || true' >> $out/bin/xdg-open
-    echo 'exit 1' >> $out/bin/xdg-open
-    chmod +x $out/bin/xdg-open
-    for name in x-www-browser www-browser gio open zen zen-beta firefox chromium google-chrome google-chrome-stable; do
-      ln -s xdg-open $out/bin/$name
-    done
-  '';
-
   # agy-usage: Parallel account usage checker querying ~/.gemini/accounts
   agy-usage = pkgs.writeShellScriptBin "agy-usage" ''
     exec ${pkgs.python3}/bin/python3 - "$@" << 'PYEOF'
@@ -209,11 +206,12 @@
     import sys
     import json
     import re
-    import tempfile
+    import signal
     import subprocess
     import threading
     import shutil
     import base64
+    import time
     from datetime import datetime, timezone
     from concurrent.futures import ThreadPoolExecutor
 
@@ -248,7 +246,7 @@
         for entry in os.listdir(accounts_dir):
             if os.path.isdir(os.path.join(accounts_dir, entry)) and not entry.startswith('.'):
                 account_ids.append(entry)
-    account_ids.sort(key=lambda x: int(x) if x.isdigit() else x)
+    account_ids.sort(key=lambda x: (0, int(x)) if x.isdigit() else (1, str(x)))
 
     if not account_ids:
         if json_mode:
@@ -359,11 +357,11 @@
         if not r["connected"]:
             msg = r["reason"]
             msg_len = len(msg)
-            pad_l = (W_BOTH - msg_len) // 2
-            pad_r = W_BOTH - msg_len - pad_l
+            pad_l = max(0, (W_BOTH - msg_len) // 2)
+            pad_r = max(0, W_BOTH - msg_len - pad_l)
             if "retry" in msg.lower() or "timed out" in msg.lower() or "verify" in msg.lower():
                 color_reason = "bright_yellow"
-            elif "expired" in msg.lower():
+            elif "expired" in msg.lower() or "no token" in msg.lower():
                 color_reason = "bright_red"
             else:
                 color_reason = "dim"
@@ -411,100 +409,27 @@
         sub_str = c(sub, "dim") + (" " * max(0, sub_pad))
         return b("│ ") + f"{sp:<{W_ACC}}" + b(" │ ") + sub_str + b(" │")
 
-    def check_single_attempt(acc_id, tok_file, timeout_sec, real_home):
-        with tempfile.TemporaryDirectory(prefix=f"agy-usage-{acc_id}-") as tmpdir:
-            tmp_cli = os.path.join(tmpdir, ".gemini", "antigravity-cli")
-            os.makedirs(os.path.join(tmp_cli, "cache"), exist_ok=True)
-            tmp_token = os.path.join(tmp_cli, "antigravity-oauth-token")
-            shutil.copyfile(tok_file, tmp_token)
-            os.chmod(tmp_token, 0o600)
+    active_procs = set()
+    active_procs_lock = threading.Lock()
 
-            for fn in ["settings.json", "jetski_state.pbtxt"]:
-                src = os.path.join(real_home, ".gemini/antigravity-cli", fn)
-                if os.path.exists(src):
-                    os.symlink(src, os.path.join(tmp_cli, fn))
-            ob = os.path.join(real_home, ".gemini/antigravity-cli/cache/onboarding.json")
-            if os.path.exists(ob):
-                os.symlink(ob, os.path.join(tmp_cli, "cache/onboarding.json"))
-
-            fake_bin = "${fakeBrowser}/bin"
-            tmp_bin = os.path.join(tmpdir, "bin")
-            os.makedirs(tmp_bin, exist_ok=True)
-            fake_script = "#!/bin/sh\nkill -TERM $PPID 2>/dev/null || true\nexit 1\n"
-            for b_name in [
-                "xdg-open", "x-www-browser", "www-browser", "gio", "open",
-                "zen", "zen-beta", "firefox", "chromium", "google-chrome", "google-chrome-stable"
-            ]:
-                b_path = os.path.join(tmp_bin, b_name)
-                with open(b_path, "w") as f:
-                    f.write(fake_script)
-                os.chmod(b_path, 0o755)
-
-            env = dict(
-                os.environ,
-                HOME=tmpdir,
-                PATH=f"{fake_bin}:{tmp_bin}:" + os.environ.get("PATH", ""),
-                BROWSER=os.path.join(fake_bin, "xdg-open"),
-                DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
-                DO_NOT_TRACK="1",
-                GEMINI_TELEMETRY_ENABLED="false",
-            )
-
-            try:
-                res = subprocess.run(
-                    ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
-                    stdin=subprocess.DEVNULL,
-                    capture_output=True, text=True, timeout=timeout_sec, env=env
-                )
-            except subprocess.TimeoutExpired as e:
-                out_str = (e.stdout or "") if isinstance(e.stdout, str) else (e.stdout or b"").decode("utf-8", "replace")
-                err_str = (e.stderr or "") if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace")
-                low_out = (out_str + "\n" + err_str).lower()
-                if "authentication required" in low_out or "invalid_grant" in low_out or "revoked" in low_out:
-                    return "PERM_ERROR", "Auth expired"
-                if "eligibility check failed" in low_out or "verify your account" in low_out:
-                    return "PERM_ERROR", "Verify in browser"
-                return "TIMED_OUT", None
-            except Exception:
-                return "ERROR", None
-
-            if os.path.exists(tmp_token):
+    def sig_handler(sig, frame):
+        with active_procs_lock:
+            for p in list(active_procs):
                 try:
-                    with open(tmp_token, "rb") as f_new, open(tok_file, "rb") as f_old:
-                        new_c = f_new.read()
-                        if new_c != f_old.read():
-                            with open(tok_file, "wb") as f_old_w:
-                                f_old_w.write(new_c)
-                            os.chmod(tok_file, 0o600)
+                    p.kill()
                 except Exception:
                     pass
+        sys.exit(130)
 
-            comb_out = (res.stdout or "") + "\n" + (res.stderr or "")
-            low_out = comb_out.lower()
+    signal.signal(signal.SIGINT, sig_handler)
+    signal.signal(signal.SIGTERM, sig_handler)
 
-            if "eligibility check failed" in low_out or "verify your account" in low_out:
-                return "PERM_ERROR", "Verify in browser"
-            if "authentication required" in low_out or "invalid_grant" in low_out or "revoked" in low_out:
-                return "PERM_ERROR", "Auth expired"
-            if "rate limit" in low_out or "resource has been exhausted" in low_out or "429" in comb_out:
-                return "PERM_ERROR", "Rate limited"
-            if res.returncode != 0:
-                return "ERROR", "Not connected"
-
-            try:
-                data = json.loads(res.stdout)
-                if data.get("status") == "SUCCESS":
-                    return "SUCCESS", data
-                return "ERROR", "Not connected"
-            except Exception:
-                return "ERROR", "Bad JSON"
-
-    def check_account_hedged(acc_id, update_slot_cb):
+    def check_single_account(acc_id, update_slot_cb):
         acc_path = os.path.join(accounts_dir, acc_id)
         tok_file = os.path.join(acc_path, "antigravity-oauth-token")
         email_file = os.path.join(acc_path, "email")
         if not os.path.exists(tok_file):
-            res = {"name": f"acc-{acc_id}", "connected": False, "reason": "No token", "email": None}
+            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "No token", "email": None}
             update_slot_cb(acc_id, res)
             return res
 
@@ -531,94 +456,171 @@
             except Exception:
                 pass
 
-        # real_home is resolved at module scope
+        profile_home = os.path.join(acc_path, "profile")
+        profile_cli = os.path.join(profile_home, ".gemini", "antigravity-cli")
+        profile_token = os.path.join(profile_cli, "antigravity-oauth-token")
+        cache_dir = f"/tmp/agy-cache-{acc_id}"
 
-        resolved_event = threading.Event()
-        final_res = {}
-        lock = threading.Lock()
+        try:
+            os.makedirs(os.path.join(profile_cli, "cache"), exist_ok=True)
+            os.makedirs(os.path.join(profile_home, ".gemini", "config"), exist_ok=True)
+            os.makedirs(os.path.join(profile_home, ".config"), exist_ok=True)
+            os.makedirs(os.path.join(profile_home, ".local", "share"), exist_ok=True)
 
-        def parse_success_data(data):
-            groups = data.get("command", {}).get("data", {}).get("groups", [])
-            gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
-            if not gemini:
-                return {"name": acc_id, "connected": False, "reason": "No Gemini data", "email": email}
-            buckets = gemini.get("buckets", [])
-            w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
-            h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
-            return {
-                "name": acc_id,
-                "is_current": (acc_id == current_id),
-                "connected": True,
-                "email": email,
-                "weekly": {
-                    "fraction": w_b.get("remaining_fraction"),
-                    "disabled": w_b.get("disabled", False),
-                    "reset_time": w_b.get("reset_time"),
-                    "desc": w_b.get("description", "")
-                },
-                "five_hour": {
-                    "fraction": h_b.get("remaining_fraction"),
-                    "disabled": h_b.get("disabled", False),
-                    "reset_time": h_b.get("reset_time"),
-                    "desc": h_b.get("description", "")
-                }
-            }
+            for fn in ["settings.json", "jetski_state.pbtxt"]:
+                src = os.path.join(real_home, ".gemini", "antigravity-cli", fn)
+                dst = os.path.join(profile_cli, fn)
+                if os.path.exists(src) and not os.path.exists(dst):
+                    try:
+                        os.symlink(src, dst)
+                    except Exception:
+                        pass
 
-        def worker_attempt(attempt_num, timeout_sec):
-            status, payload = check_single_attempt(acc_id, tok_file, timeout_sec, real_home)
-            with lock:
-                if resolved_event.is_set():
-                    return
-                if status == "SUCCESS":
-                    res = parse_success_data(payload)
-                    final_res.clear()
-                    final_res.update(res)
-                    resolved_event.set()
-                    update_slot_cb(acc_id, res)
-                elif status == "PERM_ERROR":
-                    res = {"name": acc_id, "connected": False, "reason": payload, "email": email}
-                    final_res.clear()
-                    final_res.update(res)
-                    resolved_event.set()
-                    update_slot_cb(acc_id, res)
+            ob_src = os.path.join(real_home, ".gemini", "antigravity-cli", "cache", "onboarding.json")
+            ob_dst = os.path.join(profile_cli, "cache", "onboarding.json")
+            if os.path.exists(ob_src) and not os.path.exists(ob_dst):
+                try:
+                    os.symlink(ob_src, ob_dst)
+                except Exception:
+                    pass
 
-        # Attempt 1: real timeout 8s, soft timeout 4s
-        threading.Thread(target=worker_attempt, args=(1, 8), daemon=True).start()
+            for src_rel, dst_rel in [
+                (".gemini/settings.json", ".gemini/settings.json"),
+                (".gemini/config/mcp_config.json", ".gemini/config/mcp_config.json")
+            ]:
+                s = os.path.join(real_home, src_rel)
+                d = os.path.join(profile_home, dst_rel)
+                if os.path.exists(s) and not os.path.exists(d):
+                    try:
+                        os.symlink(s, d)
+                    except Exception:
+                        pass
 
-        if resolved_event.wait(timeout=4.0):
-            return final_res
+            if not os.path.exists(profile_token) or (os.path.exists(tok_file) and os.path.getmtime(tok_file) > os.path.getmtime(profile_token)):
+                shutil.copyfile(tok_file, profile_token)
+                os.chmod(profile_token, 0o600)
+        except Exception:
+            pass
 
-        # t=4s: Attempt 1 soft timeout -> inform user, launch Attempt 2 in parallel (real timeout 8s)
-        update_slot_cb(acc_id, {"name": acc_id, "connected": False, "reason": "Timed out (retry 1)", "email": email})
-        threading.Thread(target=worker_attempt, args=(2, 8), daemon=True).start()
+        env = dict(
+            os.environ,
+            HOME=profile_home,
+            XDG_CONFIG_HOME=os.path.join(profile_home, ".config"),
+            XDG_DATA_HOME=os.path.join(profile_home, ".local", "share"),
+            XDG_CACHE_HOME=cache_dir,
+            DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
+            DO_NOT_TRACK="1",
+            GEMINI_TELEMETRY_ENABLED="false",
+        )
 
-        if resolved_event.wait(timeout=4.0):
-            return final_res
+        try:
+            proc = subprocess.Popen(
+                ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env, stdin=subprocess.DEVNULL
+            )
+            with active_procs_lock:
+                active_procs.add(proc)
+        except Exception:
+            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Failed to run", "email": email}
+            update_slot_cb(acc_id, res)
+            return res
 
-        # t=8s: Attempt 2 soft timeout -> launch Attempt 3 in parallel (real timeout 6s)
-        update_slot_cb(acc_id, {"name": acc_id, "connected": False, "reason": "Timed out (retry 2)", "email": email})
-        threading.Thread(target=worker_attempt, args=(3, 6), daemon=True).start()
+        lines = []
+        perm_err = []
 
-        if resolved_event.wait(timeout=4.0):
-            return final_res
+        def reader():
+            for line in iter(proc.stdout.readline, ""):
+                low = line.lower()
+                if "authentication required" in low or "visit the url" in low or "invalid_grant" in low or "revoked" in low:
+                    perm_err.append("Auth expired")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                    break
+                if "eligibility check failed" in low or "verify your account" in low:
+                    perm_err.append("Verify in browser")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                    break
+                if "rate limit" in low or "resource has been exhausted" in low or "429" in low:
+                    perm_err.append("Rate limited")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                    break
+                lines.append(line)
 
-        # t=12s: Attempt 3 soft timeout -> launch Attempt 4 in parallel (real timeout 6s)
-        update_slot_cb(acc_id, {"name": acc_id, "connected": False, "reason": "Timed out (retry 3)", "email": email})
-        threading.Thread(target=worker_attempt, args=(4, 6), daemon=True).start()
+        t_reader = threading.Thread(target=reader, daemon=True)
+        t_reader.start()
 
-        if resolved_event.wait(timeout=6.0):
-            return final_res
+        try:
+            proc.wait(timeout=60)
+            t_reader.join(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            perm_err.append("Timed out")
+        finally:
+            with active_procs_lock:
+                active_procs.discard(proc)
 
-        # All exhausted (t=18s)
-        with lock:
-            if not resolved_event.is_set():
-                resolved_event.set()
-                res = {"name": acc_id, "connected": False, "reason": "Timed out", "email": email}
-                final_res.clear()
-                final_res.update(res)
-                update_slot_cb(acc_id, res)
+        if perm_err:
+            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": perm_err[0], "email": email}
+            update_slot_cb(acc_id, res)
+            return res
 
-        return final_res
+        # Sync back token if refreshed by agy
+        if os.path.exists(profile_token) and os.path.exists(tok_file):
+            try:
+                if os.path.getmtime(profile_token) > os.path.getmtime(tok_file):
+                    shutil.copyfile(profile_token, tok_file)
+                    os.chmod(tok_file, 0o600)
+            except Exception:
+                pass
+
+        out_text = "".join(lines).strip()
+        try:
+            data = json.loads(out_text)
+            if data.get("status") == "SUCCESS":
+                groups = data.get("command", {}).get("data", {}).get("groups", [])
+                gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
+                if not gemini:
+                    res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "No Gemini data", "email": email}
+                else:
+                    buckets = gemini.get("buckets", [])
+                    w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
+                    h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
+                    res = {
+                        "name": acc_id,
+                        "is_current": (acc_id == current_id),
+                        "connected": True,
+                        "email": email,
+                        "weekly": {
+                            "fraction": w_b.get("remaining_fraction"),
+                            "disabled": w_b.get("disabled", False),
+                            "reset_time": w_b.get("reset_time"),
+                            "desc": w_b.get("description", "")
+                        },
+                        "five_hour": {
+                            "fraction": h_b.get("remaining_fraction"),
+                            "disabled": h_b.get("disabled", False),
+                            "reset_time": h_b.get("reset_time"),
+                            "desc": h_b.get("description", "")
+                        }
+                    }
+            else:
+                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Not connected", "email": email}
+        except Exception:
+            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Bad JSON", "email": email}
+
+        update_slot_cb(acc_id, res)
+        return res
 
     row_map = {}
     email_map = {}
@@ -675,9 +677,9 @@
             sys.stdout.write(line + "\n")
         sys.stdout.flush()
 
-    num_workers = min(len(account_ids), 20)
+    num_workers = min(len(account_ids), 5)
     with ThreadPoolExecutor(max_workers=num_workers) as ex:
-        futures = [ex.submit(check_account_hedged, aid, update_slot) for aid in account_ids]
+        futures = [ex.submit(check_single_account, aid, update_slot) for aid in account_ids]
         for fut in futures:
             fut.result()
 
@@ -731,12 +733,10 @@
               c(f"{gw_hdr:<{W_DATA}}", "bold") + b(" │ ") +
               c(f"{g5_hdr:<{W_DATA}}", "bold") + b(" │"))
         print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
-        prev_c = True
         for i, aid in enumerate(account_ids):
-            r = results_dict.get(aid, {"name": aid, "connected": False, "reason": "Error"})
-            if show_email and i > 0 and (r["connected"] or prev_c):
+            if show_email and i > 0:
                 print(b(f"├─{dash_acc}─┼─{dash_data}─┼─{dash_data}─┤"))
-            prev_c = r["connected"]
+            r = results_dict.get(aid, {"name": aid, "connected": False, "reason": "Error"})
             print(format_row(r))
             if show_email:
                 print(format_email_row(r.get("email")))
