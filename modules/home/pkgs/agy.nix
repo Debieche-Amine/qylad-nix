@@ -212,8 +212,83 @@
     import shutil
     import base64
     import time
+    import tempfile
+    import urllib.parse
+    import urllib.request
+    import urllib.error
     from datetime import datetime, timezone
     from concurrent.futures import ThreadPoolExecutor
+
+    def get_oauth_credentials():
+        client_id = os.environ.get("AGY_OAUTH_CLIENT_ID")
+        client_secret = os.environ.get("AGY_OAUTH_CLIENT_SECRET")
+        if client_id and client_secret:
+            return client_id, client_secret
+        paths = [
+            os.path.expanduser("~/.gemini/oauth.json"),
+            os.path.expanduser("~/.gemini/antigravity-cli/oauth.json"),
+            os.path.expanduser("~/.config/agy/oauth.json"),
+        ]
+        for p in paths:
+            if os.path.isfile(p):
+                try:
+                    with open(p, "r") as f:
+                        data = json.load(f)
+                        return data.get("client_id", ""), data.get("client_secret", "")
+                except Exception:
+                    pass
+        return "", ""
+
+    def refresh_token_if_needed(tok_file):
+        try:
+            with open(tok_file, "r") as f:
+                tok_data = json.load(f)
+            token_info = tok_data.get("token", {})
+            expiry_str = token_info.get("expiry")
+            refresh_tok = token_info.get("refresh_token")
+            if not refresh_tok:
+                return None, "No refresh token"
+            needs_refresh = True
+            if expiry_str:
+                try:
+                    exp_dt = datetime.fromisoformat(expiry_str)
+                    now_dt = datetime.now(timezone.utc)
+                    if (exp_dt - now_dt).total_seconds() > 120:
+                        needs_refresh = False
+                except Exception:
+                    needs_refresh = True
+            if needs_refresh:
+                client_id, client_secret = get_oauth_credentials()
+                if not client_id or not client_secret:
+                    return None, "No OAuth client config"
+                post_data = urllib.parse.urlencode({
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "refresh_token": refresh_tok,
+                    "grant_type": "refresh_token"
+                }).encode("utf-8")
+                req = urllib.request.Request("https://oauth2.googleapis.com/token", data=post_data)
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    refreshed = json.loads(resp.read().decode("utf-8"))
+                    token_info["access_token"] = refreshed["access_token"]
+                    expires_in = refreshed.get("expires_in", 3600)
+                    new_exp = datetime.fromtimestamp(datetime.now(timezone.utc).timestamp() + expires_in, timezone.utc)
+                    token_info["expiry"] = new_exp.isoformat()
+                    tok_data["token"] = token_info
+                    with open(tok_file, "w") as f:
+                        json.dump(tok_data, f, indent=2)
+                    return tok_data, None
+            return tok_data, None
+        except urllib.error.HTTPError as e:
+            try:
+                err_msg = e.read().decode("utf-8", errors="replace").lower()
+            except Exception:
+                err_msg = ""
+            if "invalid_grant" in err_msg or "revoked" in err_msg:
+                return None, "Auth expired"
+            return None, f"HTTP {e.code}"
+        except Exception as e:
+            return None, str(e)
 
     args = sys.argv[1:]
     if "-h" in args or "--help" in args:
@@ -456,171 +531,149 @@
             except Exception:
                 pass
 
-        profile_home = os.path.join(acc_path, "profile")
-        profile_cli = os.path.join(profile_home, ".gemini", "antigravity-cli")
-        profile_token = os.path.join(profile_cli, "antigravity-oauth-token")
-        cache_dir = f"/tmp/agy-cache-{acc_id}"
+        tok_data, err = refresh_token_if_needed(tok_file)
+        if err:
+            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": err, "email": email}
+            update_slot_cb(acc_id, res)
+            return res
 
-        try:
-            os.makedirs(os.path.join(profile_cli, "cache"), exist_ok=True)
-            os.makedirs(os.path.join(profile_home, ".gemini", "config"), exist_ok=True)
-            os.makedirs(os.path.join(profile_home, ".config"), exist_ok=True)
-            os.makedirs(os.path.join(profile_home, ".local", "share"), exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix=f"agy-usage-{acc_id}-") as tmpdir:
+            cli_dir = os.path.join(tmpdir, ".gemini", "antigravity-cli")
+            cfg_dir = os.path.join(tmpdir, ".gemini", "config")
+            os.makedirs(cli_dir, exist_ok=True)
+            os.makedirs(cfg_dir, exist_ok=True)
+
+            # Isolated empty MCP config prevents running heavy browser/system MCP instances
+            with open(os.path.join(cfg_dir, "mcp_config.json"), "w") as f:
+                json.dump({"mcpServers": {}}, f)
+
+            tmp_token = os.path.join(cli_dir, "antigravity-oauth-token")
+            shutil.copyfile(tok_file, tmp_token)
+            os.chmod(tmp_token, 0o600)
 
             for fn in ["settings.json", "jetski_state.pbtxt"]:
                 src = os.path.join(real_home, ".gemini", "antigravity-cli", fn)
-                dst = os.path.join(profile_cli, fn)
-                if os.path.exists(src) and not os.path.exists(dst):
+                if os.path.exists(src):
                     try:
-                        os.symlink(src, dst)
+                        os.symlink(src, os.path.join(cli_dir, fn))
                     except Exception:
                         pass
 
             ob_src = os.path.join(real_home, ".gemini", "antigravity-cli", "cache", "onboarding.json")
-            ob_dst = os.path.join(profile_cli, "cache", "onboarding.json")
-            if os.path.exists(ob_src) and not os.path.exists(ob_dst):
+            if os.path.exists(ob_src):
                 try:
-                    os.symlink(ob_src, ob_dst)
+                    os.makedirs(os.path.join(cli_dir, "cache"), exist_ok=True)
+                    os.symlink(ob_src, os.path.join(cli_dir, "cache", "onboarding.json"))
                 except Exception:
                     pass
 
-            for src_rel, dst_rel in [
-                (".gemini/settings.json", ".gemini/settings.json"),
-                (".gemini/config/mcp_config.json", ".gemini/config/mcp_config.json")
-            ]:
-                s = os.path.join(real_home, src_rel)
-                d = os.path.join(profile_home, dst_rel)
-                if os.path.exists(s) and not os.path.exists(d):
-                    try:
-                        os.symlink(s, d)
-                    except Exception:
-                        pass
-
-            if not os.path.exists(profile_token) or (os.path.exists(tok_file) and os.path.getmtime(tok_file) > os.path.getmtime(profile_token)):
-                shutil.copyfile(tok_file, profile_token)
-                os.chmod(profile_token, 0o600)
-        except Exception:
-            pass
-
-        env = dict(
-            os.environ,
-            HOME=profile_home,
-            XDG_CONFIG_HOME=os.path.join(profile_home, ".config"),
-            XDG_DATA_HOME=os.path.join(profile_home, ".local", "share"),
-            XDG_CACHE_HOME=cache_dir,
-            DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
-            DO_NOT_TRACK="1",
-            GEMINI_TELEMETRY_ENABLED="false",
-        )
-
-        try:
-            proc = subprocess.Popen(
-                ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env, stdin=subprocess.DEVNULL
+            env = dict(
+                os.environ,
+                HOME=tmpdir,
+                XDG_CONFIG_HOME=os.path.join(tmpdir, ".config"),
+                XDG_DATA_HOME=os.path.join(tmpdir, ".local", "share"),
+                XDG_CACHE_HOME=os.path.join(tmpdir, ".cache"),
+                DBUS_SESSION_BUS_ADDRESS="unix:path=/tmp/nonexistent-dbus-socket",
+                DO_NOT_TRACK="1",
+                GEMINI_TELEMETRY_ENABLED="false",
             )
-            with active_procs_lock:
-                active_procs.add(proc)
-        except Exception:
-            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Failed to run", "email": email}
-            update_slot_cb(acc_id, res)
-            return res
 
-        lines = []
-        perm_err = []
-
-        def reader():
-            for line in iter(proc.stdout.readline, ""):
-                low = line.lower()
-                if "authentication required" in low or "visit the url" in low or "invalid_grant" in low or "revoked" in low:
-                    perm_err.append("Auth expired")
-                    try:
-                        proc.kill()
-                    except Exception:
-                        pass
-                    break
-                if "eligibility check failed" in low or "verify your account" in low:
-                    perm_err.append("Verify in browser")
-                    try:
-                        proc.kill()
-                    except Exception:
-                        pass
-                    break
-                if "rate limit" in low or "resource has been exhausted" in low or "429" in low:
-                    perm_err.append("Rate limited")
-                    try:
-                        proc.kill()
-                    except Exception:
-                        pass
-                    break
-                lines.append(line)
-
-        t_reader = threading.Thread(target=reader, daemon=True)
-        t_reader.start()
-
-        try:
-            proc.wait(timeout=60)
-            t_reader.join(timeout=2)
-        except subprocess.TimeoutExpired:
             try:
-                proc.kill()
+                proc = subprocess.Popen(
+                    ["${antigravityCli}/bin/agy", "-p", "/usage", "--output-format", "json"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=env,
+                    stdin=subprocess.DEVNULL
+                )
+                with active_procs_lock:
+                    active_procs.add(proc)
             except Exception:
-                pass
-            perm_err.append("Timed out")
-        finally:
-            with active_procs_lock:
-                active_procs.discard(proc)
+                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Failed to run", "email": email}
+                update_slot_cb(acc_id, res)
+                return res
 
-        if perm_err:
-            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": perm_err[0], "email": email}
-            update_slot_cb(acc_id, res)
-            return res
-
-        # Sync back token if refreshed by agy
-        if os.path.exists(profile_token) and os.path.exists(tok_file):
             try:
-                if os.path.getmtime(profile_token) > os.path.getmtime(tok_file):
-                    shutil.copyfile(profile_token, tok_file)
-                    os.chmod(tok_file, 0o600)
-            except Exception:
-                pass
+                stdout, stderr = proc.communicate(timeout=55)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
+                proc.communicate()
+                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Timed out", "email": email}
+                update_slot_cb(acc_id, res)
+                return res
+            finally:
+                with active_procs_lock:
+                    active_procs.discard(proc)
 
-        out_text = "".join(lines).strip()
-        try:
-            data = json.loads(out_text)
-            if data.get("status") == "SUCCESS":
-                groups = data.get("command", {}).get("data", {}).get("groups", [])
-                gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
-                if not gemini:
-                    res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "No Gemini data", "email": email}
+            # Sync back token if refreshed by agy
+            if os.path.exists(tmp_token) and os.path.exists(tok_file):
+                try:
+                    if os.path.getmtime(tmp_token) > os.path.getmtime(tok_file):
+                        shutil.copyfile(tmp_token, tok_file)
+                        os.chmod(tok_file, 0o600)
+                except Exception:
+                    pass
+
+            if proc.returncode != 0:
+                err_low = (stderr + "\n" + stdout).lower()
+                if "authentication required" in err_low or "visit the url" in err_low or "invalid_grant" in err_low or "revoked" in err_low:
+                    reason = "Auth expired"
+                elif "eligibility check failed" in err_low or "verify your account" in err_low:
+                    reason = "Verify in browser"
+                elif "rate limit" in err_low or "resource has been exhausted" in err_low or "429" in err_low:
+                    reason = "Rate limited"
                 else:
-                    buckets = gemini.get("buckets", [])
-                    w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
-                    h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
-                    res = {
-                        "name": acc_id,
-                        "is_current": (acc_id == current_id),
-                        "connected": True,
-                        "email": email,
-                        "weekly": {
-                            "fraction": w_b.get("remaining_fraction"),
-                            "disabled": w_b.get("disabled", False),
-                            "reset_time": w_b.get("reset_time"),
-                            "desc": w_b.get("description", "")
-                        },
-                        "five_hour": {
-                            "fraction": h_b.get("remaining_fraction"),
-                            "disabled": h_b.get("disabled", False),
-                            "reset_time": h_b.get("reset_time"),
-                            "desc": h_b.get("description", "")
-                        }
-                    }
-            else:
-                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Not connected", "email": email}
-        except Exception:
-            res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Bad JSON", "email": email}
+                    reason = "Failed to run"
+                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": reason, "email": email}
+                update_slot_cb(acc_id, res)
+                return res
 
-        update_slot_cb(acc_id, res)
-        return res
+            out_text = stdout.strip()
+            json_start = out_text.find("{")
+            json_end = out_text.rfind("}")
+            if json_start != -1 and json_end != -1 and json_end > json_start:
+                out_text = out_text[json_start:json_end+1]
+
+            try:
+                data = json.loads(out_text)
+                if data.get("status") == "SUCCESS":
+                    groups = data.get("command", {}).get("data", {}).get("groups", [])
+                    gemini = next((g for g in groups if g.get("name") == "Gemini Models"), None)
+                    if not gemini:
+                        res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "No Gemini data", "email": email}
+                    else:
+                        buckets = gemini.get("buckets", [])
+                        w_b = next((b for b in buckets if b.get("id") == "gemini-weekly" or b.get("window") == "weekly"), {})
+                        h_b = next((b for b in buckets if b.get("id") == "gemini-5h" or b.get("window") == "5h"), {})
+                        res = {
+                            "name": acc_id,
+                            "is_current": (acc_id == current_id),
+                            "connected": True,
+                            "email": email,
+                            "weekly": {
+                                "fraction": w_b.get("remaining_fraction"),
+                                "disabled": w_b.get("disabled", False),
+                                "reset_time": w_b.get("reset_time"),
+                                "desc": w_b.get("description", "")
+                            },
+                            "five_hour": {
+                                "fraction": h_b.get("remaining_fraction"),
+                                "disabled": h_b.get("disabled", False),
+                                "reset_time": h_b.get("reset_time"),
+                                "desc": h_b.get("description", "")
+                            }
+                        }
+                else:
+                    res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Not connected", "email": email}
+            except Exception:
+                res = {"name": acc_id, "is_current": (acc_id == current_id), "connected": False, "reason": "Bad JSON", "email": email}
+
+            update_slot_cb(acc_id, res)
+            return res
 
     row_map = {}
     email_map = {}
@@ -677,7 +730,7 @@
             sys.stdout.write(line + "\n")
         sys.stdout.flush()
 
-    num_workers = min(len(account_ids), 5)
+    num_workers = min(len(account_ids), 10)
     with ThreadPoolExecutor(max_workers=num_workers) as ex:
         futures = [ex.submit(check_single_account, aid, update_slot) for aid in account_ids]
         for fut in futures:
