@@ -73,5 +73,6 @@ in {
     pi3
 
     pkgs.micro
+    pkgs.gocryptfs
   ];
 }

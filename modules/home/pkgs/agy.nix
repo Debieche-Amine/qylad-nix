@@ -268,7 +268,7 @@
                     "grant_type": "refresh_token"
                 }).encode("utf-8")
                 req = urllib.request.Request("https://oauth2.googleapis.com/token", data=post_data)
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=10) as resp:
                     refreshed = json.loads(resp.read().decode("utf-8"))
                     token_info["access_token"] = refreshed["access_token"]
                     expires_in = refreshed.get("expires_in", 3600)
@@ -548,7 +548,22 @@
                 json.dump({"mcpServers": {}}, f)
 
             tmp_token = os.path.join(cli_dir, "antigravity-oauth-token")
-            shutil.copyfile(tok_file, tmp_token)
+            # Strip avatar picture claim to avoid 30s TCP timeouts on lh3.googleusercontent.com
+            try:
+                tok_copy = dict(tok_data)
+                idt = tok_copy.get("id_token", "")
+                if idt and "." in idt:
+                    parts = idt.split(".")
+                    payload_b64 = parts[1] + "=" * (-len(parts[1]) % 4)
+                    claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+                    if "picture" in claims:
+                        claims.pop("picture", None)
+                        new_payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")
+                        tok_copy["id_token"] = f"{parts[0]}.{new_payload}.{parts[2]}"
+                with open(tmp_token, "w") as f:
+                    json.dump(tok_copy, f)
+            except Exception:
+                shutil.copyfile(tok_file, tmp_token)
             os.chmod(tmp_token, 0o600)
 
             for fn in ["settings.json", "jetski_state.pbtxt"]:
@@ -595,7 +610,7 @@
                 return res
 
             try:
-                stdout, stderr = proc.communicate(timeout=55)
+                stdout, stderr = proc.communicate(timeout=120)
             except subprocess.TimeoutExpired:
                 try:
                     proc.kill()
@@ -609,11 +624,18 @@
                 with active_procs_lock:
                     active_procs.discard(proc)
 
-            # Sync back token if refreshed by agy
+            # Sync back token if refreshed by agy (preserve original id_token on disk)
             if os.path.exists(tmp_token) and os.path.exists(tok_file):
                 try:
                     if os.path.getmtime(tmp_token) > os.path.getmtime(tok_file):
-                        shutil.copyfile(tmp_token, tok_file)
+                        with open(tmp_token, "r") as f:
+                            new_data = json.load(f)
+                        with open(tok_file, "r") as f:
+                            orig_data = json.load(f)
+                        if "token" in new_data:
+                            orig_data["token"] = new_data["token"]
+                        with open(tok_file, "w") as f:
+                            json.dump(orig_data, f, indent=2)
                         os.chmod(tok_file, 0o600)
                 except Exception:
                     pass
@@ -730,7 +752,7 @@
             sys.stdout.write(line + "\n")
         sys.stdout.flush()
 
-    num_workers = min(len(account_ids), 10)
+    num_workers = min(len(account_ids), 8)
     with ThreadPoolExecutor(max_workers=num_workers) as ex:
         futures = [ex.submit(check_single_account, aid, update_slot) for aid in account_ids]
         for fut in futures:
