@@ -144,7 +144,7 @@ in {
           # repeat_rate =
           xkb_layout = "fr,ara";
           xkb_variant = "nodeadkeys,azerty";
-          xkb_options = "caps:escape,grp:rctrl_rshift_toggle";
+          xkb_options = "grp:rctrl_rshift_toggle";
           xkb_numlock = "enabled";
           xkb_capslock = "disabled";
         };

@@ -131,7 +131,7 @@ in {
       input = {
         kb_layout = "fr,ara";
         kb_variant = "nodeadkeys,azerty";
-        kb_options = "caps:escape,grp:shifts_toggle";
+        kb_options = "grp:shifts_toggle";
         numlock_by_default = true;
         follow_mouse = 1;
         sensitivity = 0.0;

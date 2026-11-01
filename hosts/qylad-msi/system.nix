@@ -39,6 +39,7 @@ in {
     # ../../modules/system/services/tor.nix
     ../../modules/system/services/ip-monitor.nix
     ../../modules/system/services/ydotool.nix
+    ../../modules/system/services/keyd.nix
     # ../../modules/system/services/tlp.nix
     # ../../modules/system/services/good-morning-chatgpt.nix
     ../../modules/system/services/upower.nix
