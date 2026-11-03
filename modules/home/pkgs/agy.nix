@@ -176,7 +176,12 @@
             echo "$ACCOUNT_ID" > "$REAL_HOME/.gemini/accounts/.current" 2>/dev/null || true
 
             export HOME="$PROFILE_HOME"
-            export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
+            if [ -n "''${AGYN_XDG_CONFIG:-}" ]; then
+              export XDG_CONFIG_HOME="$AGYN_XDG_CONFIG"
+              mkdir -p "$AGYN_XDG_CONFIG"
+            else
+              export XDG_CONFIG_HOME="$PROFILE_HOME/.config"
+            fi
             export XDG_DATA_HOME="$PROFILE_HOME/.local/share"
             if [ -n "''${AGYN_CACHE_DIR:-}" ]; then
               export XDG_CACHE_HOME="$AGYN_CACHE_DIR"

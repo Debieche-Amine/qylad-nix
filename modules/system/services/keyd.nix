@@ -7,6 +7,8 @@
         settings = {
           main = {
             capslock = "space";
+            rightshift = "rightshift";
+            rightcontrol = "rightcontrol";
           };
         };
       };
