@@ -267,9 +267,9 @@
         };
       };
 
-      # Route external links (clicked outside browser) into Nexus
+      # Route external links (clicked outside browser) into the last opened workspace
       spaceRouting = {
-        defaultExternalRoute = "f280bafe-7813-433e-8a1b-116ed23825e9";
+        defaultExternalRoute = "most-recent-space";
       };
 
       # Declarative Workspaces (Spaces) linked to containers
