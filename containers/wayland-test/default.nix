@@ -31,7 +31,6 @@ in {
         ../../modules/system/locale.nix
       ];
       environment.systemPackages = with pkgs; [
-        vscode
       ];
       nixpkgs.config.allowUnfree = true;
 

@@ -19,6 +19,8 @@
       ACTION="switch"
       USE_NH=false
       COMMIT_MSG=""
+      LABEL=""
+      SAFE_LABEL=""
 
       usage() {
               cat <<'EOF'
@@ -32,6 +34,7 @@
 
       Options:
         -m, --message MSG      Custom commit message (default: "nixos: (YYYYMMDD-HHMMSS)")
+        -l, --label LABEL      Custom bootloader/GRUB label (sets NIXOS_LABEL)
         --nh                   Use 'nh' instead of standard 'nixos-rebuild'
         --no-sub               Disable binary cache substituters (--option substitute false)
         -h, --help             Show this help message
@@ -50,6 +53,14 @@
                               exit 2
                       fi
                       COMMIT_MSG="$2"
+                      shift 2
+                      ;;
+              -l | --label)
+                      if [[ $# -lt 2 || "$2" == --* ]]; then
+                              echo "Error: -l/--label requires a label string." >&2
+                              exit 2
+                      fi
+                      LABEL="$2"
                       shift 2
                       ;;
               switch | --switch)
@@ -98,6 +109,20 @@
               NIXOS_EXTRA_ARGS=(--option substitute false)
       fi
 
+      if [[ -n "$LABEL" ]]; then
+              SAFE_LABEL="$(echo "$LABEL" | tr ' ' '-' | tr -cd '[:alnum:]:_\.-')"
+              if [[ -z "$SAFE_LABEL" ]]; then
+                      echo "Error: -l/--label contains no valid characters ([a-zA-Z0-9:_.-])." >&2
+                      exit 2
+              fi
+              export NIXOS_LABEL="$SAFE_LABEL"
+              if [[ "$USE_NH" == true ]]; then
+                      NH_EXTRA_ARGS=(--impure "''${NH_EXTRA_ARGS[@]}")
+              else
+                      NIXOS_EXTRA_ARGS=(--impure "''${NIXOS_EXTRA_ARGS[@]}")
+              fi
+      fi
+
       COMMIT_AFTER_BUILD=false
       if [[ "$ACTION" == "switch" || -n "$COMMIT_MSG" ]]; then
               COMMIT_AFTER_BUILD=true
@@ -112,7 +137,11 @@
                       fi
                       CMD=(nh os switch "$FLAKE_PATH" --hostname "$FLAKE_TARGET" "''${NH_EXTRA_ARGS[@]}")
               else
-                      CMD=(sudo nixos-rebuild switch --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      if [[ -n "$SAFE_LABEL" ]]; then
+                              CMD=(sudo env "NIXOS_LABEL=$SAFE_LABEL" nixos-rebuild switch --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      else
+                              CMD=(sudo nixos-rebuild switch --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      fi
               fi
               ;;
       test)
@@ -123,11 +152,19 @@
                       fi
                       CMD=(nh os test "$FLAKE_PATH" --hostname "$FLAKE_TARGET" "''${NH_EXTRA_ARGS[@]}")
               else
-                      CMD=(sudo nixos-rebuild test --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      if [[ -n "$SAFE_LABEL" ]]; then
+                              CMD=(sudo env "NIXOS_LABEL=$SAFE_LABEL" nixos-rebuild test --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      else
+                              CMD=(sudo nixos-rebuild test --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+                      fi
               fi
               ;;
       build)
-              CMD=(nixos-rebuild build --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+              if [[ -n "$SAFE_LABEL" ]]; then
+                      CMD=(env "NIXOS_LABEL=$SAFE_LABEL" nixos-rebuild build --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+              else
+                      CMD=(nixos-rebuild build --flake "$FLAKE_PATH#$FLAKE_TARGET" "''${NIXOS_EXTRA_ARGS[@]}")
+              fi
               ;;
       esac
 
@@ -153,7 +190,11 @@
               if git diff --cached --quiet; then
                       echo "No staged changes to commit."
               else
-                      MSG="''${COMMIT_MSG:-nixos: ($TIMESTAMP)}"
+                      DEFAULT_MSG="nixos: ($TIMESTAMP)"
+                      if [[ -n "$SAFE_LABEL" && -z "$COMMIT_MSG" ]]; then
+                              DEFAULT_MSG="nixos: ($TIMESTAMP) [$SAFE_LABEL]"
+                      fi
+                      MSG="''${COMMIT_MSG:-$DEFAULT_MSG}"
                       git commit -m "$MSG" || exit 1
                       echo "Git commit created: $MSG"
               fi

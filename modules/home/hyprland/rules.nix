@@ -27,6 +27,7 @@
       "match:class ^(hypr-control-panel)$, float on, size 1360 780, center on"
       "match:class ^(power-profile-gui)$, float on, size 620 740, center on"
       "match:class ^([Ff]ilee)$, float on, center on"
+      "match:class ^(kitty)$, suppress_event maximize"
     ];
 
     layerrule = [

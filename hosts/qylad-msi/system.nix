@@ -88,18 +88,18 @@ in {
     #     username = "albion-4";
     #     sshPort = 20104;
     #   };
-    container-wayland-test = mkWaylandTestContainer {
-      username = "wayland-test";
-      sshPort = 20000;
-    };
-    container-gnome = mkGnomeContainer {
-      autoStart = false;
-      username = "gnome";
-      sshPort = 20001;
-      noVncPort = 6080;
-      vncPort = 5900;
-      resolution = "1920x1080";
-    };
+    # container-wayland-test = mkWaylandTestContainer {
+    #   username = "wayland-test";
+    #   sshPort = 20000;
+    # };
+    # container-gnome = mkGnomeContainer {
+    #   autoStart = false;
+    #   username = "gnome";
+    #   sshPort = 20001;
+    #   noVncPort = 6080;
+    #   vncPort = 5900;
+    #   resolution = "1920x1080";
+    # };
     # fabrik = mkFabrikContainer {
     #   inherit inputs;
     #   username = "fabrik";
