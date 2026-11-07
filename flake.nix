@@ -86,6 +86,19 @@
         ];
       };
 
+      yone-desktop = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+
+        specialArgs = {
+          inherit inputs;
+          username = "yone";
+        };
+
+        modules = [
+          ./hosts/yone-desktop
+        ];
+      };
+
       vm-test = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
 

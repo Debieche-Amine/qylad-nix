@@ -35,4 +35,13 @@
     pkgs.virt-viewer
     (pkgs.callPackage ../../../pkgs/filee {})
   ];
+
+  xdg.configFile."autostart/filee.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Filee
+    Exec=Filee --background
+    Terminal=false
+    X-GNOME-Autostart-enabled=true
+  '';
 }
